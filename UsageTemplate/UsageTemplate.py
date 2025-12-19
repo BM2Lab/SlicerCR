@@ -70,6 +70,7 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._parameterNode = None
         self._parameterNodeGuiTag = None
         self.count = 0
+        self.num_points = 10
         self.demo5_transforms_hierarchy = None
         self.demo_flag = 0
         self.demo8_index = 0
@@ -106,6 +107,7 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             
 
     def onTimer1Timeout(self):
+        self.timer_1.stop()
         self.count += 1
         if self.ui.DemoNumberDropDown.currentText == "Demo 1":
             self.demo_flag = 1
@@ -136,7 +138,8 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.demo_flag = 8
             success = self.demo8()
 
-
+        self.timer_1.start(int(1000 / int(self.ui.FrequencyInput.text)))
+        
     def checkRobotExists(self, robot_name):
         SRVRobot_node = slicer.mrmlScene.GetFirstNodeByName("SRVRobotsNode")
         if SRVRobot_node:
@@ -154,10 +157,10 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                            -scale * math.radians(90), scale * math.radians(45), scale * math.radians(30),scale * math.radians(30),
                            scale * math.radians(90), scale * math.radians(45), scale * math.radians(30),scale * math.radians(30)]
         segment_length = 125
-        backbone_waypoint0 = self.getStraightBackboneWaypoints(length=80, num_points=5)
-        backbone_waypoint1 = self.getPeriodicSweepingTubeWaypoints(time=self.count/100, length=segment_length)
-        backbone_waypoint2 = self.getPeriodicSweepingTubeWaypoints(time=self.count/100,length=segment_length, theta_max=-np.pi/4)
-        backbone_waypoint3 = self.getPeriodicSweepingTubeWaypoints(time=self.count/100,length=segment_length, theta_max=np.pi/4)
+        backbone_waypoint0 = self.getStraightBackboneWaypoints(length=80, num_points=self.num_points)
+        backbone_waypoint1 = self.getPeriodicSweepingTubeWaypoints(time=self.count/100, length=segment_length, num_points=self.num_points)
+        backbone_waypoint2 = self.getPeriodicSweepingTubeWaypoints(time=self.count/100,length=segment_length, theta_max=-np.pi/4, num_points=self.num_points)
+        backbone_waypoint3 = self.getPeriodicSweepingTubeWaypoints(time=self.count/100,length=segment_length, theta_max=np.pi/4, num_points=self.num_points)
         backbone_waypoints = np.concatenate((backbone_waypoint0, backbone_waypoint1, backbone_waypoint2, backbone_waypoint3), axis=0)
         if self.checkRobotExists(robot_name):
             success, _= self.SRV_logic.updateRobotState(robot_name, joint_positions, backbone_waypoints)
@@ -167,7 +170,7 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
     def demo2(self):
         robot_name = "Demo_2_Robot"
-        backbone_waypoint1 = self.getPeriodicSweepingTubeWaypoints(time=self.count/1000, length=200)
+        backbone_waypoint1 = self.getPeriodicSweepingTubeWaypoints(time=self.count/1000, length=200, num_points=self.num_points)
         if self.checkRobotExists(robot_name):
             success, _= self.SRV_logic.updateRobotState(robot_name, backbone_waypoints=backbone_waypoint1)
             return success
@@ -181,7 +184,6 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         max_angle = [np.pi/3, np.pi/4, np.pi/3]
         min_angle = 0.01       # Minimal angle span for non-extending segments
         radius = 200           # Fixed radius for all arcs
-        num_points = 10
         phase_duration = 20   # Number of timer ticks per phase (adjust for speed)
         total_phases = 6       # 3 extend + 3 retract
         phase = (self.count // phase_duration) % total_phases
@@ -216,9 +218,9 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             a1 = a2 = a3 = min_angle
 
         # Generate waypoints for each segment with current angle_span
-        wp1 = self.getPeriodicSweepingTubeWaypointsWithFixedRadius(radius=radius, theta=a1, num_points=num_points)
-        wp2 = self.getPeriodicSweepingTubeWaypointsWithFixedRadius(radius=radius, theta=a2, num_points=num_points)
-        wp3 = self.getPeriodicSweepingTubeWaypointsWithFixedRadius(radius=radius, theta=a3, num_points=num_points)
+        wp1 = self.getPeriodicSweepingTubeWaypointsWithFixedRadius(radius=radius, theta=a1, num_points=self.num_points)
+        wp2 = self.getPeriodicSweepingTubeWaypointsWithFixedRadius(radius=radius, theta=a2, num_points=self.num_points)
+        wp3 = self.getPeriodicSweepingTubeWaypointsWithFixedRadius(radius=radius, theta=a3, num_points=self.num_points)
         # Concatenate all segments
         backbone_waypoints = np.concatenate((wp1, wp2, wp3), axis=0)
 
@@ -230,13 +232,12 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
     def demo4(self):
         robot_name = "Demo_4_Robot"
-        num_points = 10
-        segment_base_waypoints = self.getStraightBackboneWaypoints(length=1, num_points=num_points)
-        segment_outer_base_waypoints = self.getStraightBackboneWaypoints(length=20, num_points=num_points)
-        segment_inner_base_waypoints = self.getStraightBackboneWaypoints(length=20, num_points=num_points)
-        segment_outer_waypoint1 = self.getPeriodicSweepingTubeWaypoints(time=self.count/1000, length=100, num_points=num_points)   
-        segment_inner_front = self.getPeriodicSweepingTubeWaypoints(time=self.count/1000, length=100, num_points=num_points)
-        segment_inner_back = self.getPeriodicSweepingTubeWaypoints(time=self.count/1000, length=60, num_points=num_points)
+        segment_base_waypoints = self.getStraightBackboneWaypoints(length=1, num_points=self.num_points)
+        segment_outer_base_waypoints = self.getStraightBackboneWaypoints(length=20, num_points=self.num_points)
+        segment_inner_base_waypoints = self.getStraightBackboneWaypoints(length=20, num_points=self.num_points)
+        segment_outer_waypoint1 = self.getPeriodicSweepingTubeWaypoints(time=self.count/1000, length=100, num_points=self.num_points)   
+        segment_inner_front = self.getPeriodicSweepingTubeWaypoints(time=self.count/1000, length=100, num_points=self.num_points)
+        segment_inner_back = self.getPeriodicSweepingTubeWaypoints(time=self.count/1000, length=60, num_points=self.num_points)
 
         backbone_waypoints = np.concatenate((segment_base_waypoints, segment_outer_base_waypoints, 
                                              segment_inner_base_waypoints, segment_outer_waypoint1,segment_inner_front, segment_inner_back), axis=0)
@@ -309,9 +310,9 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
     def demo6(self):
         robot_name = "Demo_6_Robot"
-        scale = math.sin(self.count / 10.0) * 0.5 + 0.5
+        scale = math.sin(self.count / 20.0) * 0.5 + 0.5
         L1 = L2 = L3 = 156
-        xi_1 = xi_2 = xi_3 = [0, 0.2, 0.4, 0.6,  0.8,  1]
+        xi_1 = xi_2 = xi_3 = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
         # q_1 = q_2 = q_3 = [30*scale, -30*scale, 40*scale]
         q_1 = q_2 = q_3 = [30*scale, 30, 30]
         r_1 = 46.32
@@ -345,7 +346,6 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         Demo 7: Tendon-driven catheter with multiple Tendons
         """
         robot_name = "Demo_7_Robot"
-        N = 20  # num of samples along shape
         d = 2
         
         # Define parameters for each waypoint set: [L0, amp]
@@ -375,7 +375,7 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 l_base[3] + dl4
             ])
             # Get waypoints for this segment
-            waypoints_list.append(self.ccArc(L, d, N))
+            waypoints_list.append(self.ccArc(L, d, self.num_points))
         
         # Concatenate all waypoint sets
         waypoints = np.concatenate(waypoints_list, axis=0)
@@ -391,7 +391,6 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         Generates a single-segment backbone from a kinematic needle model.
         """
         robot_name = "Demo_8_Robot"
-        num_points = 20
         kappa = 2.5
         spin_events = [(10.2, 11.2)]
         total_time = 10
@@ -400,9 +399,9 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         insertion_speed = 0.02
         total_steps = int(total_time/dt)
         if self.demo8_index % total_steps == 0:
-            self.demo8_full_path = [None]*num_points
-            z_s = np.linspace(0, 0.001, num_points)
-            for i in range(num_points):
+            self.demo8_full_path = [None]*self.num_points
+            z_s = np.linspace(0, 0.001, self.num_points)
+            for i in range(self.num_points):
                 self.demo8_full_path[i] = np.eye(4)
                 self.demo8_full_path[i][2, 3] = z_s[i]
             self.demo8_joint_value = 0
@@ -419,10 +418,10 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.demo8_joint_value = self.demo8_joint_value + u2*dt
             self.demo8_full_path.append(g_new)
         # Extract shape
-        indices = np.linspace(0, len(self.demo8_full_path)-1, num_points).astype(int)
+        indices = np.linspace(0, len(self.demo8_full_path)-1, self.num_points).astype(int)
         current_pts = np.array([self.demo8_full_path[i][:3, 3]*1000 for i in indices])
         # make current_pts
-        resampled_pts = self.resample_polyline(current_pts, num_points)
+        resampled_pts = self.resample_polyline(current_pts, self.num_points)
         self.demo8_index = (self.demo8_index + 1) % len(self.demo8_full_path)
         backbone_waypoints = resampled_pts[np.newaxis, :, :]  # (1, window, 3)
         

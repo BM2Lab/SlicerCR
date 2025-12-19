@@ -18,7 +18,7 @@ from slicer.parameterNodeWrapper import (
     WithinRange,
 )
 import json
-from Scripts.Utils.rendering_helper import RenderingHelper
+from Scripts.Utils.rendering_manager import RenderingManager
 from Scripts.Utils.state_parser import StateParser, WaypointFitter
 from Scripts.Utils.math_helper import MathHelper
 from scipy.spatial.transform import Rotation as R
@@ -67,9 +67,11 @@ class RobotVisualizer:
         self.default_segment_direction = np.array([0, 0, 1])
         self.default_u_new = np.array([1])
         self.default_mesh_direction = np.array([0, 0, 1])
+        self.vtk_matrix_base = vtk.vtkMatrix4x4()
+        self.vtk_matrix_base.Identity()
         ############
         self.segment_mapping = {}
-        self.rendering_helper = RenderingHelper()
+        self.rendering_manager = RenderingManager()
         self.state_parser = StateParser()
         self.waypoint_fitter = WaypointFitter()
         # Initialize the parameter node
@@ -111,6 +113,7 @@ class RobotVisualizer:
                 "transform_node": None,
                 "transform_node(start)": None,
                 "transform_node(end)": None,
+                "model_nodes": [],
                 "initial_transform": None
             }
         return robot
@@ -354,7 +357,9 @@ class RobotVisualizer:
         if robot.segments:
             lengths = [self.segment_mapping[segment.name]["initial_length"]*self.CONVERSION_SCALE for segment in robot.segments]
             waypoint_data = self.state_parser.initializeWaypointData(lengths)
+            was_modified = self.robot_state_node.StartModify()
             self.updateSegmentState(waypoint_data)
+            self.robot_state_node.EndModify(was_modified)
 
     def getTransformsHierarchy(self):
         # get the key transform nodes trough joint names
@@ -460,12 +465,17 @@ class RobotVisualizer:
             # Pre-compute common values
             segments = self.robot.segments
             segment_count = len(segments)
-            
             try:
                 # Batch process segments
                 for i in range(segment_count):
                     segment = segments[i]
                     segment_data = self.segment_mapping[segment.name]
+                    if len(segment_data["model_nodes"]) == 0:
+                        for idx_unit in range(len(segment.continuum_body.continuum_units)):
+                            model_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode", f"{segment.name}_continuum_unit_{idx_unit}")
+                            model_node.SetAndObserveTransformNodeID(segment_data["transform_node(start)"].GetID())
+                            model_node.CreateDefaultDisplayNodes()
+                            segment_data["model_nodes"].append(model_node)
                     start_transform_node = segment_data["transform_node(start)"]
                     # Handle end transforms
                     
@@ -480,18 +490,13 @@ class RobotVisualizer:
                         self.segment_mapping[segment.name]["transform_node(end)"].SetMatrixTransformToParent(end_pose)
                     
                     # Optimize mesh disk rendering
-                    # start_time_mesh_disk = time.time()
+                    
                     if segment.disks and segment.disks.geometry.type == 'mesh':
                         self._updateMeshDisks(segment, backbone_waypoints[i], start_transform_node)
-                    # print(f"Time spent in __onStateUpdate mesh disk part: {(time.time() - start_time_mesh_disk)*1000:.2f} ms")
-                    # Transform waypoints to world coordinates
-                    vtk_matrix_world = vtk.vtkMatrix4x4()
-                    start_transform_node.GetMatrixTransformToWorld(vtk_matrix_world)
-                    backbone_waypoints[i] = MathHelper.transformWaypoints(backbone_waypoints[i], vtk_matrix_world)
-
-                    # Update continuum units
-                    self._updateContinuumUnits(segment, vtk_matrix_world, backbone_waypoints[i])
                     
+                    # Update continuum units
+                    self._updateContinuumUnits(segment, self.vtk_matrix_base, backbone_waypoints[i])
+                    # need function to update the polydata in the model node
                     # Handle cylinder disks
                     if segment.disks and segment.disks.geometry.type == 'cylinder':
                         self._updateCylinderDisks(segment, backbone_waypoints[i])
@@ -500,7 +505,10 @@ class RobotVisualizer:
                 self.robot_state_node_was_modified = self.robot_state_node.StartModify()
                 self.robot_state_node.segment_global_waypoints = str(backbone_waypoints.tolist())
                 
-                self.rendering_helper.show(self.robot)
+                # self.rendering_helper.show(self.robot)
+                self.rendering_manager.show(self.robot, self.segment_mapping)
+            
+            
 
         # print(f"Time spent in __onStateUpdate segment part: {(time.time() - start_time)*1000:.2f} ms")
 
@@ -599,6 +607,10 @@ class RobotVisualizer:
         for disk_model_node in self.disk_model_nodes.values():
             if disk_model_node:
                 slicer.mrmlScene.RemoveNode(disk_model_node)
+        for segment_data in self.segment_mapping.values():
+            for model_node in segment_data["model_nodes"]:
+                if model_node:
+                    slicer.mrmlScene.RemoveNode(model_node)
         self.joint_mapping.clear()
         self.link_model_nodes.clear()
         self.disk_model_nodes.clear()

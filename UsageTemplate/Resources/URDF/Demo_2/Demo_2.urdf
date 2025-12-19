@@ -28,7 +28,7 @@
         <disks count="12">
             <color rgba="1.0 0.42 0.21 1.0"/>
             <geometry>
-                <cylinder radius="0.012" height="0.003"/>
+                <mesh filename="meshes/disk.STL"/>
             </geometry>
         </disks>
 
