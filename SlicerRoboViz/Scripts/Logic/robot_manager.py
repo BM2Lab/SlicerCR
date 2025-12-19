@@ -1,5 +1,6 @@
 import sys
 import os
+from typing import Any
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
 
@@ -13,44 +14,22 @@ import numpy as np
 import csv
 import time
 import threading
-from slicer.parameterNodeWrapper import (
-    parameterNodeWrapper,
-    WithinRange,
-)
+from Scripts.Logic.robot_nodes import RobotDescriptionNode, RobotStateNode
 import json
+from Scripts.Logic.robot_loader import RobotLoader
 from Scripts.Utils.rendering_helper import RenderingHelper
 from Scripts.Utils.state_parser import StateParser, WaypointFitter
 from Scripts.Utils.math_helper import MathHelper
 from scipy.spatial.transform import Rotation as R
-
-@parameterNodeWrapper
-class RobotDescriptionNode:
-    # Basic robot info
-    robot_name: str = ""
-    joint_names: str = ""
-    link_names: str = ""
-    segment_names: str = ""
-    joint_mapping: str = ""
-
-@parameterNodeWrapper
-class RobotStateNode:
-    """Parameter node wrapper for joint states."""
-    time_stamp: float = 0.0
-    joint_names: list[str] = []
-    joint_positions: list[float] = []
-    old_joint_positions: list[float] = []
-    segment_names: list[str] = []
-    segment_waypoints: str = ""
-    old_segment_waypoints: str = ""
-    segment_end_transforms: str = ""
-    segment_global_waypoints: str = ""
+from Scripts.Logic.transform_manager import TransformManager
 
 class RobotVisualizer:
 
     CONVERSION_SCALE = 1000
     Euler_ANGLE_ORDER = 'xyz'
     def __init__(self):
-        self.joint_mapping = {}
+        self.robot_loader = RobotLoader()
+        self.transform_manager = TransformManager(self)
         # Add performance optimization attributes
         self._cached_transforms = {}
         self._last_joint_positions = None
@@ -59,8 +38,6 @@ class RobotVisualizer:
         self._rendering_enabled = True
         self.link_model_nodes = {}
         self.disk_model_nodes = {}
-        self.transform_nodes = []
-        self.root_transform_nodes = {}
         self.robot = None
         self.urdf_dir = None
         ############
@@ -68,7 +45,7 @@ class RobotVisualizer:
         self.default_u_new = np.array([1])
         self.default_mesh_direction = np.array([0, 0, 1])
         ############
-        self.segment_mapping = {}
+        
         self.rendering_helper = RenderingHelper()
         self.state_parser = StateParser()
         self.waypoint_fitter = WaypointFitter()
@@ -76,78 +53,19 @@ class RobotVisualizer:
         
 
     def visualizeRobot(self, urdfFilePath):
-        robot = self.loadURDF(urdfFilePath)
-        if not robot:
-            qt.QMessageBox.critical(None, "Error", f"Failed to load URDF: {urdfFilePath}")
-            return
-        self._updateParameterNode(robot)
-        self._renderLinksInSlicer(robot, urdfFilePath)
-        self._setupTransformHierarchy()
-        self._ModifyTransformHierarchy()
-        self._renderContinuumBodyInSlicer(robot, urdfFilePath)
-
-
-    def loadURDF(self, urdfFilePath):
-        urdfFilePath = os.path.normpath(urdfFilePath)
-        robot = URDF_continuum.from_xml_file(urdfFilePath)
-        self.robot = robot
-
-        for joint in robot.joints:
-            self.joint_mapping[joint.name] = {
-                "type": joint.joint_type,
-                "axis": joint.axis if joint.axis else [0, 0, 0],
-                "limit": joint.limit,
-                "parent": joint.parent,
-                "child": joint.child,
-                "origin": joint.origin,
-                "transform_node": None,
-                "initial_transform": None
-            }
-        for segment in robot.segments:
-            self.segment_mapping[segment.name] = {
-                "parent": segment.parent,
-                "origin": segment.origin,
-                "initial_length": segment.continuum_body.initial_length,
-                "transform_node": None,
-                "transform_node(start)": None,
-                "transform_node(end)": None,
-                "initial_transform": None
-            }
-        return robot
-
-    
-    def _updateParameterNode(self, robot):
-        # create a parameter node for the robot description
-        parameter_node = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScriptedModuleNode')
-        parameter_node.SetName(f"SRVRobotDescriptionNode({robot.name})")
-        self.robot_description_node = RobotDescriptionNode(parameter_node)
-        self.robot_description_node.robot_name = robot.name
-        joint_names = [joint.name for joint in robot.joints]
-        self.robot_description_node.joint_names ="\n"+ ', '.join(joint_names)
-        link_names = [link.name for link in robot.links]
-        self.robot_description_node.link_names = "\n"+ ', '.join(link_names)
-        self.robot_description_node.joint_mapping = "\n"+ '\n'.join([f"Joint: {jointName}, Parent: {jointData['parent']}, Child: {jointData['child']}" for jointName, jointData in self.joint_mapping.items()])
-        
-        segment_names = [segment.name for segment in robot.segments]
-        self.robot_description_node.segment_names = "\n"+ ', '.join(segment_names)
-
-        # create a parameter node for the joint state
-        parameter_node2 = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScriptedModuleNode') 
-        parameter_node2.SetName(f"SRVRobotStateNode({robot.name})")
-        self.robot_state_node = RobotStateNode(parameter_node2)
-        self.robot_state_node.time_stamp = time.time()
-        self.robot_state_node.joint_names = joint_names
-        self.robot_state_node.joint_positions = [0.0] * len(joint_names)
-        self.robot_state_node.segment_names = segment_names
-        self.robot_state_node.AddObserver(vtk.vtkCommand.ModifiedEvent, self.__onStateUpdate)
-
-        
-    def _renderLinksInSlicer(self, robot, urdfFilePath):
         self.urdf_dir = os.path.dirname(urdfFilePath)
+        self.robot_loader.loadRobot(urdfFilePath)
+        self._renderLinksInSlicer(self.robot_loader.robot)
+        self.transform_manager.setupTransformHierarchy()
+        self.transform_manager.modifyTransformHierarchy()
+        self._renderContinuumBodyInSlicer(self.robot_loader.robot, urdfFilePath)
+
+
         
+    def _renderLinksInSlicer(self, robot):
+        """Render the links in the slicer scene"""
 
         self.link_model_nodes.clear()
-
         for link in robot.links:
             if not link.visual or not link.visual.geometry or not link.visual.geometry.filename:
                 print(f"Skipping link {link.name}: No visual geometry defined.")
@@ -162,7 +80,6 @@ class RobotVisualizer:
             orientation = link.visual.origin.rpy if link.visual.origin else [0, 0, 0]
             color = link.visual.material.color.rgba if link.visual.material and link.visual.material.color else [1, 1, 1, 1]
             modelNode,_ = self._renderMeshInSlicer(meshFilePath, link.name, position, orientation, color, scale= self.CONVERSION_SCALE)
-            
             self.link_model_nodes[link.name] = modelNode
 
 
@@ -173,19 +90,7 @@ class RobotVisualizer:
                 return joint_name, joint_data
         return None, None
     
-    def __getInitialTransformFromOrigin(self, xyz, rpy):
-        # Create VTK transform and apply rotation and translation
 
-        scaled_xyz = [x * self.CONVERSION_SCALE for x in xyz]
-        vtk_matrix = vtk.vtkMatrix4x4()
-        rot = R.from_euler(self.Euler_ANGLE_ORDER, rpy, degrees=False) # extrinsic rotation the inverse order of intrinsic rotation: Z to X to Y
-        for i in range(3):
-            for j in range(3):
-                vtk_matrix.SetElement(i, j, rot.as_matrix()[i, j])
-        vtk_matrix.SetElement(0, 3, scaled_xyz[0])
-        vtk_matrix.SetElement(1, 3, scaled_xyz[1])
-        vtk_matrix.SetElement(2, 3, scaled_xyz[2])
-        return vtk_matrix
     
     def __getSegmentInitialTransform(self, length):
         # rot is identity, trans is [0,0,length]
@@ -197,137 +102,6 @@ class RobotVisualizer:
         vtk_matrix.SetElement(3, 3, 1)
         return vtk_matrix
     
-    def _setupTransformHierarchy(self):
-
-        for jointName, jointData in self.joint_mapping.items():
-            childLinkName = jointData["child"]
-            parentLinkName = jointData["parent"]
-            # initialize the transform node (origin has a transform)
-            initial_transform = self.__getInitialTransformFromOrigin(jointData["origin"].xyz, jointData["origin"].rpy)
-            transformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTransformNode", f"{jointName}_Transform")
-            transformNode.SetMatrixTransformToParent(initial_transform)
-            jointData["transform_node"] = transformNode
-            jointData["initial_transform"] = initial_transform
-            # attach the visual transform to the joint transform
-            if childLinkName in self.link_model_nodes:
-                childModelNode = self.link_model_nodes[childLinkName]
-                visual_transform_node = childModelNode.GetParentTransformNode()
-                if visual_transform_node:
-                    visual_transform_node.SetAndObserveTransformNodeID(transformNode.GetID())
-                    print(f"Attached {childLinkName} visual to {jointName}_Transform")
-            else:
-                print(f"ERROR: Could not find model node for link: {childLinkName}")
-
-            parent_joint_name,_ = self.findJointbyChild(parentLinkName)
-            if  parent_joint_name: 
-                parentTransformNode = self.joint_mapping[parent_joint_name]["transform_node"]
-                if parentTransformNode:
-                    transformNode.SetAndObserveTransformNodeID(parentTransformNode.GetID())
-                    print(f"Attached {jointName}_Transform to {parentLinkName}_Transform")
-                else:
-                    print(f"Parent transform for {parentLinkName} not found")
-            else: # no parent joint, set as the root transform
-                #  find the parent root transform node first if not found, create a new one
-                rootTransformNode = slicer.mrmlScene.GetFirstNodeByName(f"{self.robot_name}_{parentLinkName}_Transform(root)") #TODO: if two robots has the same parent link name, this will be wrong
-                if not rootTransformNode:   
-                    rootTransformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTransformNode", f"{self.robot_name}_{parentLinkName}_Transform(root)")
-                    self.root_transform_nodes[parentLinkName] = rootTransformNode
-                
-                if parentLinkName in self.link_model_nodes:
-                    visual_transform_node = self.link_model_nodes[parentLinkName].GetParentTransformNode()
-                    if visual_transform_node:
-                        visual_transform_node.SetAndObserveTransformNodeID(rootTransformNode.GetID())
-                transformNode.SetAndObserveTransformNodeID(rootTransformNode.GetID())
-                print(f"Set {parentLinkName} as root")
-
-        for jointName, jointData in self.joint_mapping.items(): # in case the parent joint is not defined at the beginning
-            childLinkName = jointData["child"]
-            parentLinkName = jointData["parent"]
-            transformNode = jointData["transform_node"]
-            parent_joint_name,_ = self.findJointbyChild(parentLinkName)
-            if  parent_joint_name: 
-                parentTransformNode = self.joint_mapping[parent_joint_name]["transform_node"]
-                if parentTransformNode:
-                    transformNode.SetAndObserveTransformNodeID(parentTransformNode.GetID())
-
-        
-        for segment_name, segment_data in self.segment_mapping.items():
-            parent_segment_name = segment_data["parent"]
-            # child_segment_name = segment_data["child"] #TODO: child looks redundant
-            if segment_data["origin"]:
-                initial_transform = self.__getInitialTransformFromOrigin(segment_data["origin"].xyz, segment_data["origin"].rpy)
-            else:
-                initial_transform = self.__getInitialTransformFromOrigin([0,0,0],[0,0,0])
-            self.segment_mapping[segment_name]["initial_transform"] = initial_transform # TODO: check its use later
-            start_transformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTransformNode", f"{segment_name}_Transform(start)")
-            start_transformNode.SetMatrixTransformToParent(initial_transform)
-            self.segment_mapping[segment_name]["transform_node(start)"] = start_transformNode
-
-            end_transformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTransformNode", f"{segment_name}_Transform(end)")
-            self.segment_mapping[segment_name]["transform_node(end)"] = end_transformNode
-            end_transformNode.SetAndObserveTransformNodeID(start_transformNode.GetID())
-
-            if parent_segment_name in self.segment_mapping:
-                parent_end_transform_node = self.segment_mapping[parent_segment_name]["transform_node(end)"]
-                if parent_end_transform_node:
-                    start_transformNode.SetAndObserveTransformNodeID(parent_end_transform_node.GetID())
-                    print(f"Attached {segment_name}_Transform to {parent_segment_name}_Transform")
-            else: # set as the root transform
-                # check if the root transform node already exists
-                if parent_segment_name in self.root_transform_nodes:
-                    rootTransformNode = self.root_transform_nodes[parent_segment_name]
-                    start_transformNode.SetAndObserveTransformNodeID(rootTransformNode.GetID())
-                else:
-                    rootTransformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTransformNode", f"{parent_segment_name}_Transform(root)")
-                    self.root_transform_nodes[parent_segment_name] = rootTransformNode
-                    start_transformNode.SetAndObserveTransformNodeID(rootTransformNode.GetID())
-                    print(f"Set {parent_segment_name} as root")
-
-        for segment_name, segment_data in self.segment_mapping.items(): # incase the parent segment is not defined at the beginning
-            parent_segment_name = segment_data["parent"]
-            start_transformNode = segment_data["transform_node(start)"]
-            if parent_segment_name in self.segment_mapping:
-                parent_end_transform_node = self.segment_mapping[parent_segment_name]["transform_node(end)"]
-                if parent_end_transform_node:
-                    start_transformNode.SetAndObserveTransformNodeID(parent_end_transform_node.GetID())
-                    print(f"Attached {segment_name}_Transform to {parent_segment_name}_Transform")
-
-    def _ModifyTransformHierarchy(self):
-        # use the root transform node and IsTransformNodeMyChild to find the hierarchy
-        # connect seperated transform nodes
-        for parent_name, transform_node in list(self.root_transform_nodes.items()):
-            if parent_name in self.segment_mapping:
-                parent_transform_node = self.segment_mapping[parent_name]["transform_node(end)"]
-                transform_node.SetAndObserveTransformNodeID(parent_transform_node.GetID())
-                self.root_transform_nodes.pop(parent_name)
-
-            if parent_name in self.link_model_nodes:
-                joint_name, joint_data = self.findJointbyChild(parent_name)
-                if joint_name:
-                    joint_transform_node = self.joint_mapping[joint_name]["transform_node"]
-                    transform_node.SetAndObserveTransformNodeID(joint_transform_node.GetID())
-                    self.root_transform_nodes.pop(parent_name)
-
-        # check all transform nodes in the scene
-        all_transform_nodes = slicer.mrmlScene.GetNodesByClass("vtkMRMLTransformNode")
-        self.transform_nodes.append(list(self.root_transform_nodes.values())[0])
-        for i in range(all_transform_nodes.GetNumberOfItems()):
-            transformNode = all_transform_nodes.GetItemAsObject(i)
-            if self.transform_nodes[0].IsTransformNodeMyChild(transformNode):
-                self.transform_nodes.append(transformNode)
-
-
-        # convert the initial transform to the slicer transform
-        for transformNode in self.transform_nodes:
-            initial_matrix = vtk.vtkMatrix4x4()
-            transformNode.GetMatrixTransformToParent(initial_matrix)
-            converted_matrix = MathHelper.convert2SlicerTransform(initial_matrix)
-            transformNode.SetMatrixTransformToParent(converted_matrix)
-        # convert the stored initial matrix to the slicer transform
-        for jointName, jointData in self.joint_mapping.items():
-            initial_matrix = jointData["initial_transform"]
-            converted_matrix = MathHelper.convert2SlicerTransform(initial_matrix)
-            jointData["initial_transform"] = converted_matrix
 
     def _renderMeshInSlicer(self, meshFilePath,model_name, position, orientation, color, scale=None):
         modelNode = slicer.modules.models.logic().AddModel(meshFilePath)
@@ -387,7 +161,6 @@ class RobotVisualizer:
         self.robot_state_node.old_joint_positions = self.robot_state_node.joint_positions
         self.robot_state_node.joint_positions = joint_positions
         self.robot_state_node.time_stamp = time.time()
-        # print("updateJointState called")
 
     def updateSegmentState(self, backbone_waypoints: np.ndarray, end_transforms: np.ndarray=None):
         if backbone_waypoints.shape[0] != len(self.robot_state_node.segment_names):
@@ -396,9 +169,8 @@ class RobotVisualizer:
             return
         self.robot_state_node.old_segment_waypoints = self.robot_state_node.segment_waypoints
         self.robot_state_node.segment_waypoints = str(backbone_waypoints.tolist())
-        # self.robot_state_node.segment_end_transforms = str(end_transforms.tolist()) if end_transforms is not None else ""
+        self.robot_state_node.segment_end_transforms = str(end_transforms.tolist()) if end_transforms is not None else ""
         self.robot_state_node.time_stamp = time.time()
-        # print("updateSegmentState called")
 
     def clearCache(self):
         """Clear all cached objects to free memory"""
@@ -408,7 +180,6 @@ class RobotVisualizer:
         self._last_segment_waypoints = None
 
     def __onStateUpdate(self, caller, event):
-        # print("__onStateUpdate called")
         # start_time = time.time()
         
         # Cache frequently accessed values
@@ -447,7 +218,7 @@ class RobotVisualizer:
                     transform.Translate(-axis[0] * scale_factor, -axis[1] * scale_factor, axis[2] * scale_factor)
 
                 transformNode.SetMatrixTransformToParent(transform.GetMatrix())
-        # print(f"Time spent in __onStateUpdate joint part: {(time.time() - start_time)*1000:.2f} ms")
+        
         # Optimize segment waypoint updates
         old_segment_waypoints = self.robot_state_node.old_segment_waypoints
         segment_waypoints = self.robot_state_node.segment_waypoints
@@ -460,6 +231,10 @@ class RobotVisualizer:
             # Pre-compute common values
             segments = self.robot.segments
             segment_count = len(segments)
+            
+            # Temporarily disable rendering for batch updates
+            original_rendering_state = self._rendering_enabled
+            self._rendering_enabled = False
             
             try:
                 # Batch process segments
@@ -480,10 +255,9 @@ class RobotVisualizer:
                         self.segment_mapping[segment.name]["transform_node(end)"].SetMatrixTransformToParent(end_pose)
                     
                     # Optimize mesh disk rendering
-                    # start_time_mesh_disk = time.time()
                     if segment.disks and segment.disks.geometry.type == 'mesh':
                         self._updateMeshDisks(segment, backbone_waypoints[i], start_transform_node)
-                    # print(f"Time spent in __onStateUpdate mesh disk part: {(time.time() - start_time_mesh_disk)*1000:.2f} ms")
+
                     # Transform waypoints to world coordinates
                     vtk_matrix_world = vtk.vtkMatrix4x4()
                     start_transform_node.GetMatrixTransformToWorld(vtk_matrix_world)
@@ -496,13 +270,13 @@ class RobotVisualizer:
                     if segment.disks and segment.disks.geometry.type == 'cylinder':
                         self._updateCylinderDisks(segment, backbone_waypoints[i])
             finally:
-                
-                self.robot_state_node_was_modified = self.robot_state_node.StartModify()
                 self.robot_state_node.segment_global_waypoints = str(backbone_waypoints.tolist())
-                
+                self._rendering_enabled = original_rendering_state
+
+            if self._rendering_enabled:
                 self.rendering_helper.show(self.robot)
 
-        # print(f"Time spent in __onStateUpdate segment part: {(time.time() - start_time)*1000:.2f} ms")
+
 
     def _updateMeshDisks(self, segment, backbone_waypoint, start_transform_node):
         """Optimized mesh disk update"""

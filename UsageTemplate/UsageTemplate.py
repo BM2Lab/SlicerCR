@@ -19,6 +19,7 @@ import time
 import csv
 from datetime import datetime
 import io
+from scipy.linalg import expm
 #
 # UsageTemplate
 #
@@ -71,9 +72,9 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.count = 0
         self.demo5_transforms_hierarchy = None
         self.demo_flag = 0
-
-        
-        
+        self.demo8_index = 0
+        self.demo8_full_path = None
+        self.demo8_joint_value = 0
 
     def setup(self) -> None:
         """Called when the user opens the module the first time and the widget is initialized."""
@@ -129,6 +130,12 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         elif self.ui.DemoNumberDropDown.currentText == "Demo 7":
             self.demo_flag = 7
             success = self.demo7()
+        elif self.ui.DemoNumberDropDown.currentText == "Demo 8":
+            if self.demo_flag != 8:
+                self.demo8_index = 0
+            self.demo_flag = 8
+            success = self.demo8()
+
 
     def checkRobotExists(self, robot_name):
         SRVRobot_node = slicer.mrmlScene.GetFirstNodeByName("SRVRobotsNode")
@@ -378,6 +385,52 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         else:
             return False
 
+    def demo8(self):
+        """
+        Demo 8: Bevel-tip needle steering using Lie group integration.
+        Generates a single-segment backbone from a kinematic needle model.
+        """
+        robot_name = "Demo_8_Robot"
+        num_points = 20
+        kappa = 2.5
+        spin_events = [(10.2, 11.2)]
+        total_time = 10
+        dt = 0.05
+        spin_rate = np.deg2rad(180)
+        insertion_speed = 0.02
+        total_steps = int(total_time/dt)
+        if self.demo8_index % total_steps == 0:
+            self.demo8_full_path = [None]*num_points
+            z_s = np.linspace(0, 0.001, num_points)
+            for i in range(num_points):
+                self.demo8_full_path[i] = np.eye(4)
+                self.demo8_full_path[i][2, 3] = z_s[i]
+            self.demo8_joint_value = 0
+        else:
+            spinning = any(start <= self.demo8_index*dt <= end for (start, end) in spin_events)
+            if spinning:
+                u1 = 0.0          # no insertion during spin
+                u2 = spin_rate    # rotate needle
+            else:
+                u1 = insertion_speed
+                u2 = 0.0
+            g_last = self.demo8_full_path[-1]
+            g_new = self.propagate_needle(g_last, kappa, [u1, u2], dt)
+            self.demo8_joint_value = self.demo8_joint_value + u2*dt
+            self.demo8_full_path.append(g_new)
+        # Extract shape
+        indices = np.linspace(0, len(self.demo8_full_path)-1, num_points).astype(int)
+        current_pts = np.array([self.demo8_full_path[i][:3, 3]*1000 for i in indices])
+        # make current_pts
+        resampled_pts = self.resample_polyline(current_pts, num_points)
+        self.demo8_index = (self.demo8_index + 1) % len(self.demo8_full_path)
+        backbone_waypoints = resampled_pts[np.newaxis, :, :]  # (1, window, 3)
+        
+        if self.checkRobotExists(robot_name):
+            success, _ = self.SRV_logic.updateRobotState(robot_name, joint_positions=[self.demo8_joint_value], backbone_waypoints=backbone_waypoints)
+            return success
+        else:
+            return False
 
     def softArmForwardKinematics(self, L0, q, r, xi):
         """L0 : float
@@ -696,6 +749,123 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             xyz[i, :] = T[0:3, 3]        # take translation part (column 4 in MATLAB)
         xyz = xyz[np.newaxis, :, :]
         return xyz
+    # ============================================================
+# Lie algebra utilities for Demo 8 (needle steering example)
+# ============================================================
+
+
+    def hat(self, v):
+        """so(3) hat operator for a 3-vector."""
+        return np.array(
+            [
+                [0.0, -v[2], v[1]],
+                [v[2], 0.0, -v[0]],
+                [-v[1], v[0], 0.0],
+            ]
+        )
+
+
+    def se3_hat(self,v6):
+        """Convert 6×1 twist vector [v; ω] to 4×4 se(3) matrix."""
+        v = v6[:3]
+        w = v6[3:]
+        m = np.zeros((4, 4))
+        m[:3, :3] = self.hat(w)
+        m[:3, 3] = v
+        return m
+
+
+    def needle_twists(self,kappa):
+        """
+        Returns the two left-invariant control vector fields V1 and V2.
+        V1 = [e3; κ e1], V2 = [0; e3]
+        """
+        e1 = np.array([1.0, 0.0, 0.0])
+        e3 = np.array([0.0, 0.0, 1.0])
+        V1 = np.hstack([e3, kappa * e1])          # forward insertion
+        V2 = np.hstack([np.zeros(3), e3])         # axial rotation
+        return V1, V2
+
+
+    def generate_trajectory_time(self,total_time, insertion_speed, spin_events, spin_rate, dt=0.1):
+        """
+        Generate (u1, u2, dt) commands over time.
+
+        spin_events: list of (t_start, t_end) intervals in seconds.
+        insertion_speed: constant insertion velocity when not spinning.
+        spin_rate: constant angular velocity during spins.
+        dt: time discretization.
+
+        Returns: list of (u1, u2, dt)
+        """
+        traj = []
+        joint_traj= []
+        t = 0.0
+        while t < total_time:
+            spinning = any(start <= t <= end for (start, end) in spin_events)
+            if spinning:
+                u1 = 0.0          # no insertion during spin
+                u2 = spin_rate    # rotate needle
+            else:
+                u1 = insertion_speed
+                u2 = 0.0
+            traj.append((u1, u2, dt))
+            if len(joint_traj) == 0:
+                joint_traj.append(0)
+            else:
+                joint_traj.append(joint_traj[-1] + u2*dt)
+            t += dt
+        return traj, joint_traj
+
+
+    def resample_polyline(self,pts, N):
+        """Resample a 3D polyline to have N uniformly spaced points in arc length."""
+        if len(pts) == 1:
+            return np.repeat(pts, N, axis=0)
+
+        diffs = np.diff(pts, axis=0)
+        seg_len = np.linalg.norm(diffs, axis=1)
+        s = np.hstack([[0], np.cumsum(seg_len)])
+        total_s = s[-1]
+        if total_s == 0:
+            return np.repeat(pts[:1], N, axis=0)
+
+        s_query = np.linspace(0, total_s, N)
+        new_pts = np.zeros((N, 3))
+        for i in range(3):
+            new_pts[:, i] = np.interp(s_query, s, pts[:, i])
+        return new_pts
+
+    def propagate_needle(self,g0, kappa, actuation, dt):
+        """
+        Propagate the needle using the Lie group integration
+        """
+        g = g0
+        V1, V2 = self.needle_twists(kappa)
+        xi = actuation[0] * V1 + actuation[1] * V2
+        g = g @ expm(self.se3_hat(xi) * dt)
+        
+        return g
+        
+    def simulate_needle(self,kappa, trajectory):
+        """
+        kappa: curvature parameter (1/m)
+        trajectory: list of (u1, u2, dt)
+        N: number of resampled waypoints
+
+        Returns:
+            Nx3 array of needle waypoints
+        """
+        gs = []
+        g = np.eye(4)
+        gs.append(g)
+        V1, V2 = self.needle_twists(kappa)
+        for (u1, u2, dt) in trajectory:
+            xi = u1 * V1 + u2 * V2
+            g = g @ expm(self.se3_hat(xi) * dt)
+            gs.append(g)
+        return  gs
+
     ###################################################################
     ##########################Built in Functions#######################
     ###################################################################

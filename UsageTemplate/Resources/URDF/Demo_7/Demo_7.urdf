@@ -37,7 +37,7 @@
 
             <continuum_body initial_length="0.2">
                 <continuum_unit radius="0.002"  tag="backbone">
-                    <color rgba="0.45 0.45 0.45 1.0"/>
+                    <color rgba="1.0 0.42 0.21 1"/>
                 </continuum_unit>
 
             </continuum_body>

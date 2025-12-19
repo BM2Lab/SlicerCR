@@ -12,19 +12,31 @@ Below are visual demonstrations of SlicerRoboViz capabilities:
 
 ### Robot Visualization Examples
 
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="Media/SRV_Demos_Rob7.gif" alt="Demo 7" width="200px"/><br/>
+      <sub><i>Hu et al., 2018, Computer Assisted Surgery.</i></sub>
+    </td>
+    <td align="center">
+      <img src="Media/SRV_Demos_Rob8.gif" alt="Demo 8" width="200px"/><br/>
+      <sub><i>Webste et al., 2006, IJRR.</i></sub>
+    </td>
+  </tr>
+</table>
 
 <table align="center">
   <tr>
     <td align="center">
-      <img src="Media/SRV_Demos_Rob1.gif" alt="Demo 1" width="250px"/><br/>
-      <sub><i>Wang et al., 2025, Device.</i></sub>
+      <img src="Media/SRV_Demos_Rob4.gif" alt="Demo 4" width="200px"/><br/>
+      <sub><i>Webster et al., 2009, Exp. Robotics XI.</i></sub>
     </td>
     <td align="center">
-      <img src="Media/SRV_Demos_Rob2.gif" alt="Demo 2" width="250px"/><br/>
-      <sub><i>Azizkhani et al., 2025, IEEE RA-L.</i></sub>
+      <img src="Media/SRV_Demos_Rob5.gif" alt="Demo 5" width="200px"/><br/>
+      <sub><i>Custom Design</i></sub>
     </td>
     <td align="center">
-      <img src="Media/SRV_Demos_Rob3.gif" alt="Demo 3" width="250px"/><br/>
+      <img src="Media/SRV_Demos_Rob3.gif" alt="Demo 3" width="200px"/><br/>
       <sub><i>Oliver-Butler et al., 2021, IEEE T-RO.</i></sub>
     </td>
   </tr>
@@ -33,16 +45,16 @@ Below are visual demonstrations of SlicerRoboViz capabilities:
 <table align="center">
   <tr>
     <td align="center">
-      <img src="Media/SRV_Demos_Rob4.gif" alt="Demo 4" width="250px"/><br/>
-      <sub><i>Webster et al., 2009, Exp. Robotics XI.</i></sub>
-    </td>
-    <td align="center">
-      <img src="Media/SRV_Demos_Rob5.gif" alt="Demo 5" width="250px"/><br/>
-      <sub><i>Custom Design</i></sub>
-    </td>
-    <td align="center">
-      <img src="Media/SRV_Demos_Rob6.gif" alt="Demo 6" width="250px"/><br/>
+      <img src="Media/SRV_Demos_Rob6.gif" alt="Demo 6" width="200px"/><br/>
       <sub><i>Amanov et al., 2021, IJRR.</i></sub>
+    </td>
+    <td align="center">
+      <img src="Media/SRV_Demos_Rob2.gif" alt="Demo 2" width="200px"/><br/>
+      <sub><i>Azizkhani et al., 2025, IEEE RA-L.</i></sub>
+    </td>
+    <td align="center">
+      <img src="Media/SRV_Demos_Rob1.gif" alt="Demo 1" width="200px"/><br/>
+      <sub><i>Wang et al., 2025, Device.</i></sub>
     </td>
   </tr>
 </table>

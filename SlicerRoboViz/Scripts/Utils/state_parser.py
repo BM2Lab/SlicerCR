@@ -178,10 +178,10 @@ class WaypointFitter:
 
     def calculateTendonWaypoints(self, curve_points, normal, binormal, tendon_config):
         """
-        Calculate tendon waypoints based on backbone curve and tendon configuration.
+        Calculate tendon waypoints based on centerline curve and tendon configuration.
         
         Args:
-            curve_points: Mx3 array of backbone curve points
+            curve_points: Mx3 array of centerline curve points
             normal: Mx3 array of normal vectors
             binormal: Mx3 array of binormal vectors
             tendon_config: (angle, offset) tuple for each tendon
@@ -192,7 +192,7 @@ class WaypointFitter:
         offset, angle = tendon_config
         local_x = offset * np.cos(angle)
         local_y = offset * np.sin(angle)
-        # Transform to global frame
+        # Transform to global frame (the origin coordinate frame is the start point of the centerline)
         global_offset = local_x * normal + local_y * binormal
         tendon_waypoints = curve_points + global_offset
         return tendon_waypoints
@@ -322,7 +322,7 @@ class WaypointFitter:
         
 
     def getIntermediatePoses(self,default_direction, convention, waypoint_data, u_new):
-        start_time = time.time()
+
         if self.__isCached(waypoint_data):
             tck = self.cached_tck
         else:
@@ -342,8 +342,8 @@ class WaypointFitter:
             transform_matrix[:3,:3] = rotation_matrix
             transform_matrix[:3,3] = point_centers[i]
             transform_matrices.append(transform_matrix)
-        end_time = time.time()
-        # print(f"Time spent in getIntermediatePoses: {(end_time - start_time)*1000:.2f} ms")
+
+       
         return point_centers , point_directions, transform_matrices
 
     def getEndPose(self, waypoint_data):

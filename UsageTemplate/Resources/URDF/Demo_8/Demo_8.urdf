@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot
+  name="Demo_8_Robot">
+  
+
+    <segment name="segment_1">
+            <parent name="world"/>
+             <origin
+                xyz="0 0 0"
+                rpy="0 0 0" />
+            <continuum_body initial_length="0.20">
+                <continuum_unit radius="0.0035"  tag="steerable segment">
+                    <color rgba="0.74 0.76 0.78 1.0"/>
+                </continuum_unit>
+            </continuum_body>
+            
+
+    </segment>
+
+    <joint
+        name="bevel-needle_tip_joint"
+        type="revolute">
+        <origin
+        xyz="0 0 0.0"
+        rpy="0 0 0" />
+        <parent
+        link="segment_1" />
+        <child
+        link="bevel-needle_tip" />
+        <axis
+        xyz="0 0 1" />
+    </joint>
+
+    <link
+        name="bevel-needle_tip">
+        <visual>
+        <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+        <geometry>
+        <mesh filename="meshes/bevel-needle_tip.STL"/>
+        </geometry>
+        <material
+        name="">
+        <color
+        rgba="0.74 0.76 0.78 1.0" />
+        </material>
+        </visual>
+    </link>
+    
+</robot>

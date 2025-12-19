@@ -343,23 +343,23 @@ class SlicerRoboVizLogic(ScriptedLoadableModuleLogic):
         return None
     
     def updateRobotState(self, robot_name:str, joint_positions: list[float]=None, backbone_waypoints: np.ndarray=None, segment_end_transforms: np.ndarray=None) -> bool:
-        current_time = time.time()
-        start_time = current_time
+        
+        start_time = time.time()
         
         visualizer = self.__getVisualizerFromName(robot_name)
         if not visualizer:
             qt.QMessageBox.critical(None, "Error", f"Robot {robot_name} is not loaded")
             return False
             
-        was_modified = visualizer.robot_state_node.StartModify()
+        # was_modified = visualizer.robot_state_node.StartModify()
+        was_modified = visualizer.robot_state_node_was_modified
         if joint_positions is not None:
             visualizer.updateJointState(joint_positions)
         if backbone_waypoints is not None:
             visualizer.updateSegmentState(backbone_waypoints, segment_end_transforms)
         visualizer.robot_state_node.EndModify(was_modified)
         
-        end_time = time.time()
-        execution_time = end_time - start_time
+        execution_time = time.time() - start_time
         
         return True, execution_time
 
