@@ -342,7 +342,7 @@ class SlicerRoboVizLogic(ScriptedLoadableModuleLogic):
                 return visualizer["visualizer"]
         return None
     
-    def updateRobotState(self, robot_name:str, joint_positions: list[float]=None, backbone_waypoints: np.ndarray=None, segment_end_transforms: np.ndarray=None) -> bool:
+    def updateRobotState(self, robot_name:str, joint_positions: list[float]=None, backbone_SPs: np.ndarray=None, segment_end_transforms: np.ndarray=None) -> bool:
         
         start_time = time.time()
         
@@ -352,11 +352,11 @@ class SlicerRoboVizLogic(ScriptedLoadableModuleLogic):
             return False
             
         # was_modified = visualizer.robot_state_node.StartModify()
-        was_modified = visualizer.robot_state_node_was_modified
+        was_modified = visualizer.robot_state_node.StartModify()
         if joint_positions is not None:
             visualizer.updateJointState(joint_positions)
-        if backbone_waypoints is not None:
-            visualizer.updateSegmentState(backbone_waypoints, segment_end_transforms)
+        if backbone_SPs is not None:
+            visualizer.updateSegmentState(backbone_SPs, segment_end_transforms)
         visualizer.robot_state_node.EndModify(was_modified)
         
         execution_time = time.time() - start_time

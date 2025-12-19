@@ -569,18 +569,6 @@ xmlr.reflect(Sheath, tag='sheath', params=[
     xmlr.Element('color', Color, False),
 ])
 
-# class ContinuumBody(xmlr.Object):
-#     def __init__(self, backbone=None, tendons=None, sheath=None):
-#         self.backbone = backbone
-#         self.tendons = tendons
-#         self.sheath = sheath
-
-# xmlr.reflect(ContinuumBody, tag='continuum_body', params=[
-
-#     xmlr.Element('backbone', Backbone, False),
-#     xmlr.Element('tendons', Tendons, False),
-#     xmlr.Element('sheath', Sheath, False)
-# ])
 
 class ContinuumBody(xmlr.Object):
     def __init__(self, initial_length=None):
@@ -593,7 +581,7 @@ xmlr.reflect(ContinuumBody, tag='continuum_body', params=[
     xmlr.AggregateElement('continuum_unit', ContinuumUnit)
 ])
 
-class Disks(xmlr.Object):
+class Vertebrae(xmlr.Object):
     def __init__(self, count=None, span=None, color=None, geometry=None):
         self.count = count
         self.span = span
@@ -602,7 +590,7 @@ class Disks(xmlr.Object):
         self.centers = None
         self.directions = None
 
-xmlr.reflect(Disks, tag='disks', params=[
+xmlr.reflect(Vertebrae, tag='vertebrae', params=[
     xmlr.Attribute('count', int),
     xmlr.Attribute('span', 'vector2', False),
     xmlr.Element('geometry', 'geometric'),
@@ -611,19 +599,19 @@ xmlr.reflect(Disks, tag='disks', params=[
 
 class Segment(xmlr.Object):
     def __init__(self, name=None, parent=None,
-                 origin=None, continuum_body=None, disks=None):
+                 origin=None, continuum_body=None, vertebrae=None):
         self.name = name
         self.parent = parent
         self.origin = origin
         self.continuum_body = continuum_body
-        self.disks = disks
+        self.vertebrae = vertebrae
 
 xmlr.reflect(Segment, tag='segment', params=[
     xmlr.Attribute('name', str),
     xmlr.Element('parent', xmlr.SimpleElementType('name', str)),
     origin_element,
     xmlr.Element('continuum_body', ContinuumBody, False),
-    xmlr.Element('disks', Disks, False)
+    xmlr.Element('vertebrae', Vertebrae, False)
 ])
 
 class Robot(xmlr.Object):

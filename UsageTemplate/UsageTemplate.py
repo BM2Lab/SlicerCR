@@ -70,7 +70,7 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._parameterNode = None
         self._parameterNodeGuiTag = None
         self.count = 0
-        self.num_points = 10
+        self.num_points = 20
         self.demo5_transforms_hierarchy = None
         self.demo_flag = 0
         self.demo8_index = 0
@@ -157,22 +157,22 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                            -scale * math.radians(90), scale * math.radians(45), scale * math.radians(30),scale * math.radians(30),
                            scale * math.radians(90), scale * math.radians(45), scale * math.radians(30),scale * math.radians(30)]
         segment_length = 125
-        backbone_waypoint0 = self.getStraightBackboneWaypoints(length=80, num_points=self.num_points)
-        backbone_waypoint1 = self.getPeriodicSweepingTubeWaypoints(time=self.count/100, length=segment_length, num_points=self.num_points)
-        backbone_waypoint2 = self.getPeriodicSweepingTubeWaypoints(time=self.count/100,length=segment_length, theta_max=-np.pi/4, num_points=self.num_points)
-        backbone_waypoint3 = self.getPeriodicSweepingTubeWaypoints(time=self.count/100,length=segment_length, theta_max=np.pi/4, num_points=self.num_points)
-        backbone_waypoints = np.concatenate((backbone_waypoint0, backbone_waypoint1, backbone_waypoint2, backbone_waypoint3), axis=0)
+        backbone_SP0 = self.getStraightBackboneSPs(length=80, num_points=self.num_points)
+        backbone_SP1 = self.getPeriodicSweepingTubeSPs(time=self.count/100, length=segment_length, num_points=self.num_points)
+        backbone_SP2 = self.getPeriodicSweepingTubeSPs(time=self.count/100,length=segment_length, theta_max=-np.pi/4, num_points=self.num_points)
+        backbone_SP3 = self.getPeriodicSweepingTubeSPs(time=self.count/100,length=segment_length, theta_max=np.pi/4, num_points=self.num_points)
+        backbone_SPs = np.concatenate((backbone_SP0, backbone_SP1, backbone_SP2, backbone_SP3), axis=0)
         if self.checkRobotExists(robot_name):
-            success, _= self.SRV_logic.updateRobotState(robot_name, joint_positions, backbone_waypoints)
+            success, _= self.SRV_logic.updateRobotState(robot_name, joint_positions, backbone_SPs)
             return success
         else:
             return False
 
     def demo2(self):
         robot_name = "Demo_2_Robot"
-        backbone_waypoint1 = self.getPeriodicSweepingTubeWaypoints(time=self.count/1000, length=200, num_points=self.num_points)
+        backbone_SP1 = self.getPeriodicSweepingTubeSPs(time=self.count/1000, length=200, num_points=self.num_points)
         if self.checkRobotExists(robot_name):
-            success, _= self.SRV_logic.updateRobotState(robot_name, backbone_waypoints=backbone_waypoint1)
+            success, _= self.SRV_logic.updateRobotState(robot_name, backbone_SPs=backbone_SP1)
             return success
         else:
             return False
@@ -217,96 +217,103 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         else:
             a1 = a2 = a3 = min_angle
 
-        # Generate waypoints for each segment with current angle_span
-        wp1 = self.getPeriodicSweepingTubeWaypointsWithFixedRadius(radius=radius, theta=a1, num_points=self.num_points)
-        wp2 = self.getPeriodicSweepingTubeWaypointsWithFixedRadius(radius=radius, theta=a2, num_points=self.num_points)
-        wp3 = self.getPeriodicSweepingTubeWaypointsWithFixedRadius(radius=radius, theta=a3, num_points=self.num_points)
+        # Generate SPs for each segment with current angle_span
+        wp1 = self.getPeriodicSweepingTubeSPsWithFixedRadius(radius=radius, theta=a1, num_points=self.num_points)
+        wp2 = self.getPeriodicSweepingTubeSPsWithFixedRadius(radius=radius, theta=a2, num_points=self.num_points)
+        wp3 = self.getPeriodicSweepingTubeSPsWithFixedRadius(radius=radius, theta=a3, num_points=self.num_points)
         # Concatenate all segments
-        backbone_waypoints = np.concatenate((wp1, wp2, wp3), axis=0)
+        backbone_SPs = np.concatenate((wp1, wp2, wp3), axis=0)
 
         if self.checkRobotExists(robot_name):
-            success, _= self.SRV_logic.updateRobotState(robot_name, backbone_waypoints=backbone_waypoints)
+            success, _= self.SRV_logic.updateRobotState(robot_name, backbone_SPs=backbone_SPs)
             return success
         else:
             return False
 
     def demo4(self):
         robot_name = "Demo_4_Robot"
-        segment_base_waypoints = self.getStraightBackboneWaypoints(length=1, num_points=self.num_points)
-        segment_outer_base_waypoints = self.getStraightBackboneWaypoints(length=20, num_points=self.num_points)
-        segment_inner_base_waypoints = self.getStraightBackboneWaypoints(length=20, num_points=self.num_points)
-        segment_outer_waypoint1 = self.getPeriodicSweepingTubeWaypoints(time=self.count/1000, length=100, num_points=self.num_points)   
-        segment_inner_front = self.getPeriodicSweepingTubeWaypoints(time=self.count/1000, length=100, num_points=self.num_points)
-        segment_inner_back = self.getPeriodicSweepingTubeWaypoints(time=self.count/1000, length=60, num_points=self.num_points)
+        segment_base_SPs = self.getStraightBackboneSPs(length=1, num_points=self.num_points)
+        segment_outer_base_SPs = self.getStraightBackboneSPs(length=20, num_points=self.num_points)
+        segment_inner_base_SPs = self.getStraightBackboneSPs(length=20, num_points=self.num_points)
+        segment_outer_SP1 = self.getPeriodicSweepingTubeSPs(time=self.count/1000, length=100, num_points=self.num_points)   
+        segment_inner_front = self.getPeriodicSweepingTubeSPs(time=self.count/1000, length=100, num_points=self.num_points)
+        segment_inner_back = self.getPeriodicSweepingTubeSPs(time=self.count/1000, length=60, num_points=self.num_points)
 
-        backbone_waypoints = np.concatenate((segment_base_waypoints, segment_outer_base_waypoints, 
-                                             segment_inner_base_waypoints, segment_outer_waypoint1,segment_inner_front, segment_inner_back), axis=0)
+        backbone_SPs = np.concatenate((segment_base_SPs, segment_outer_base_SPs, 
+                                             segment_inner_base_SPs, segment_outer_SP1,segment_inner_front, segment_inner_back), axis=0)
         if self.checkRobotExists(robot_name):
-            success, _= self.SRV_logic.updateRobotState(robot_name, backbone_waypoints=backbone_waypoints)
+            success, _= self.SRV_logic.updateRobotState(robot_name, backbone_SPs=backbone_SPs)
             return success
         else:
             return False
 
     def demo5(self):
-        robot_name = "Demo_5_Robot"
-        scale = math.sin(self.count / 10.0) 
-        # 15 joints
-        angle = 10
-        joint_positions = [scale * math.radians(angle)]*15
-        joint_names = ["joint_unit_1_unit_2", "joint_unit_2_unit_3", "joint_unit_3_unit_4", 
-                                   "joint_unit_4_unit_5", "joint_unit_5_unit_6", "joint_unit_6_unit_7", 
-                                   "joint_unit_7_unit_8", "joint_unit_8_unit_9", "joint_unit_9_unit_10", 
-                                   "joint_unit_10_unit_11", "joint_unit_11_unit_12", "joint_unit_12_unit_13", 
-                                   "joint_unit_13_unit_14", "joint_unit_14_unit_15", "joint_unit_15_unit_16"]
-        # specify the waypoints of the backbone
-        original_points_left = np.array([[10,0,5.1],[10,0,8.4]])
-        original_points_right = np.array([[-10,0,5.1],[-10,0,8.4]])
-        scales =[
-                    0.8912, 0.7942, 0.7078, 0.6308, 0.5622,
-                    0.5010, 0.4465, 0.3979, 0.3546, 0.3160,
-                    0.2816, 0.2510, 0.2237, 0.1994, 0.1777
-                ]
-        
-        if self.checkRobotExists(robot_name):
-            logic = slicer.util.getModuleLogic("SlicerRoboViz")
-            logic.updateRobotState(robot_name, joint_positions=joint_positions)
-            if self.demo5_transforms_hierarchy is None:
-                self.demo5_transforms_hierarchy = logic.getTransformsHierarchy(robot_name)
-            # get the transform node for each joint, get the tranform from the root to this transform and apply it to the scaled points
-            root_transform_node = self.demo5_transforms_hierarchy[list(self.demo5_transforms_hierarchy.keys())[0]]
-            
-            waypoints_left = np.zeros((1, (len(joint_names)+1)*2, 3))
-            waypoints_left[0,0,:] = original_points_left[0,0:3]
-            waypoints_left[0,1,:] = original_points_left[1,0:3]
-            
-            waypoints_right = np.zeros((1, (len(joint_names)+1)*2, 3))
-            waypoints_right[0,0,:] = original_points_right[0,0:3]
-            waypoints_right[0,1,:] = original_points_right[1,0:3]
-            for i in range(len(joint_names)):
-                transform_matrix = vtk.vtkMatrix4x4()
-                joint_transform_node = self.demo5_transforms_hierarchy[joint_names[i]]
-                joint_transform_node.GetMatrixTransformToNode(root_transform_node, transform_matrix)
-                scaled_points_left = original_points_left * scales[i]
-                # add a 1 to the end of the scaled_points_left
-                scaled_points_left = np.concatenate((scaled_points_left, np.ones((2,1))), axis=1)
-                scaled_points_right = original_points_right * scales[i]
-                # add a 1 to the end of the scaled_points_right
-                scaled_points_right = np.concatenate((scaled_points_right, np.ones((2,1))), axis=1)
-                transform_matrix_np = np.zeros((4,4))
-                for m in range(4):
-                    for n in range(4):
-                        transform_matrix_np[m,n] = transform_matrix.GetElement(m,n)
-                scaled_points_left = (transform_matrix_np @ scaled_points_left.T).T
-                scaled_points_right = (transform_matrix_np @ scaled_points_right.T).T
-                waypoints_left[0,i*2+2:i*2+4,:] = scaled_points_left[0:2,0:3]
-                waypoints_right[0,i*2+2:i*2+4,:] = scaled_points_right[0:2,0:3]
-            waypoints_left = np.insert(waypoints_left, 0, np.array([[10,0,0]]), axis=1)
-            waypoints_right = np.insert(waypoints_right, 0, np.array([[-10,0,0]]), axis=1)
-            backbone_waypoints = np.concatenate((waypoints_left, waypoints_right), axis=0)
-            success, execution_time = logic.updateRobotState(robot_name, backbone_waypoints=backbone_waypoints)
-            return execution_time
-        else:
-            return False
+            robot_name = "Demo_5_Robot"
+            scale = math.sin(self.count / 10.0) 
+            # 15 joints
+            angle = 10
+            joint_positions = [scale * math.radians(angle)]*15
+            joint_names = ["joint_unit_1_unit_2", "joint_unit_2_unit_3", "joint_unit_3_unit_4", 
+                                    "joint_unit_4_unit_5", "joint_unit_5_unit_6", "joint_unit_6_unit_7", 
+                                    "joint_unit_7_unit_8", "joint_unit_8_unit_9", "joint_unit_9_unit_10", 
+                                    "joint_unit_10_unit_11", "joint_unit_11_unit_12", "joint_unit_12_unit_13", 
+                                    "joint_unit_13_unit_14", "joint_unit_14_unit_15", "joint_unit_15_unit_16"]
+            # specify the SPs of the backbone
+            original_points_left = np.array([[10,0,5.1],[10,0,8.4]])
+            original_points_right = np.array([[-10,0,5.1],[-10,0,8.4]])
+            scales =[
+                        0.8912, 0.7942, 0.7078, 0.6308, 0.5622,
+                        0.5010, 0.4465, 0.3979, 0.3546, 0.3160,
+                        0.2816, 0.2510, 0.2237, 0.1994, 0.1777
+                    ]
+            view = slicer.app.layoutManager().threeDWidget(0).threeDView()
+            view.setRenderEnabled(False)
+            if self.checkRobotExists(robot_name):
+                logic = slicer.util.getModuleLogic("SlicerRoboViz")
+                logic.updateRobotState(robot_name, joint_positions=joint_positions)
+                if self.demo5_transforms_hierarchy is None:
+                    self.demo5_transforms_hierarchy = logic.getTransformsHierarchy(robot_name)
+                # get the transform node for each joint, get the tranform from the root to this transform and apply it to the scaled points
+                root_transform_node = self.demo5_transforms_hierarchy[list(self.demo5_transforms_hierarchy.keys())[0]]
+                
+                SPs_left = np.zeros((1, (len(joint_names)+1)*2, 3))
+                SPs_left[0,0,:] = original_points_left[0,0:3]
+                SPs_left[0,1,:] = original_points_left[1,0:3]
+                
+                SPs_right = np.zeros((1, (len(joint_names)+1)*2, 3))
+                SPs_right[0,0,:] = original_points_right[0,0:3]
+                SPs_right[0,1,:] = original_points_right[1,0:3]
+                for i in range(len(joint_names)):
+                    transform_matrix = vtk.vtkMatrix4x4()
+                    joint_transform_node = self.demo5_transforms_hierarchy[joint_names[i]]
+                    joint_transform_node.GetMatrixTransformToNode(root_transform_node, transform_matrix)
+                    scaled_points_left = original_points_left * scales[i]
+                    # add a 1 to the end of the scaled_points_left
+                    scaled_points_left = np.concatenate((scaled_points_left, np.ones((2,1))), axis=1)
+                    scaled_points_right = original_points_right * scales[i]
+                    # add a 1 to the end of the scaled_points_right
+                    scaled_points_right = np.concatenate((scaled_points_right, np.ones((2,1))), axis=1)
+                    transform_matrix_np = np.zeros((4,4))
+                    for m in range(4):
+                        for n in range(4):
+                            transform_matrix_np[m,n] = transform_matrix.GetElement(m,n)
+                    scaled_points_left = (transform_matrix_np @ scaled_points_left.T).T
+                    scaled_points_right = (transform_matrix_np @ scaled_points_right.T).T
+                    SPs_left[0,i*2+2:i*2+4,:] = scaled_points_left[0:2,0:3]
+                    SPs_right[0,i*2+2:i*2+4,:] = scaled_points_right[0:2,0:3]
+                SPs_left = np.insert(SPs_left, 0, np.array([[10,0,0]]), axis=1)
+                SPs_right = np.insert(SPs_right, 0, np.array([[-10,0,0]]), axis=1)
+                
+                backbone_SPs = np.concatenate((SPs_left, SPs_right), axis=0)
+                success, execution_time = logic.updateRobotState(robot_name, backbone_SPs=backbone_SPs)
+                view.setRenderEnabled(True)
+                view.forceRender()
+                return success
+            else:
+                view.setRenderEnabled(True)
+                view.forceRender()
+                return False
+
 
     def demo6(self):
         robot_name = "Demo_6_Robot"
@@ -333,11 +340,11 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         T_1[0,3,3] = 1
         T_2[0,3,3] = 1
         T_3[0,3,3] = 1
-        backbone_waypoints = np.concatenate((p_1.reshape(1, -1, 3)  , p_2.reshape(1, -1, 3), p_3.reshape(1, -1, 3)), axis=0)
+        backbone_SPs = np.concatenate((p_1.reshape(1, -1, 3)  , p_2.reshape(1, -1, 3), p_3.reshape(1, -1, 3)), axis=0)
         end_transforms = np.concatenate((T_1, T_2, T_3), axis=0)
         
         if self.checkRobotExists(robot_name):
-            success, _= self.SRV_logic.updateRobotState(robot_name, backbone_waypoints=backbone_waypoints, segment_end_transforms=end_transforms)
+            success, _= self.SRV_logic.updateRobotState(robot_name, backbone_SPs=backbone_SPs, segment_end_transforms=end_transforms)
             return success
         else:
             return False
@@ -348,15 +355,15 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         robot_name = "Demo_7_Robot"
         d = 2
         
-        # Define parameters for each waypoint set: [L0, amp]
-        waypoint_params = [
-            {'L0': 200, 'amp': 0.5, 'steps': 100},   # waypoints_1
-            {'L0': 150, 'amp': 2, 'steps': 80},   # waypoints_2
-            {'L0': 100, 'amp': 5, 'steps': 60}    # waypoints_3
+        # Define parameters for each SP set: [L0, amp]
+        SP_params = [
+            {'L0': 200, 'amp': 0.5, 'steps': 100},   # SPs_1
+            {'L0': 150, 'amp': 2, 'steps': 80},   # SPs_2
+            {'L0': 100, 'amp': 5, 'steps': 60}    # SPs_3
         ]
         
-        waypoints_list = []
-        for params in waypoint_params:
+        SPs_list = []
+        for params in SP_params:
             L0 = params['L0']
             amp = params['amp']
             steps = params['steps']
@@ -374,13 +381,13 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 l_base[2] + dl3,
                 l_base[3] + dl4
             ])
-            # Get waypoints for this segment
-            waypoints_list.append(self.ccArc(L, d, self.num_points))
+            # Get SPs for this segment
+            SPs_list.append(self.ccArc(L, d, self.num_points))
         
-        # Concatenate all waypoint sets
-        waypoints = np.concatenate(waypoints_list, axis=0)
+        # Concatenate all SP sets
+        SPs = np.concatenate(SPs_list, axis=0)
         if self.checkRobotExists(robot_name):
-            success, _= self.SRV_logic.updateRobotState(robot_name, backbone_waypoints=waypoints)
+            success, _= self.SRV_logic.updateRobotState(robot_name, backbone_SPs=SPs)
             return success
         else:
             return False
@@ -423,10 +430,10 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # make current_pts
         resampled_pts = self.resample_polyline(current_pts, self.num_points)
         self.demo8_index = (self.demo8_index + 1) % len(self.demo8_full_path)
-        backbone_waypoints = resampled_pts[np.newaxis, :, :]  # (1, window, 3)
+        backbone_SPs = resampled_pts[np.newaxis, :, :]  # (1, window, 3)
         
         if self.checkRobotExists(robot_name):
-            success, _ = self.SRV_logic.updateRobotState(robot_name, joint_positions=[self.demo8_joint_value], backbone_waypoints=backbone_waypoints)
+            success, _ = self.SRV_logic.updateRobotState(robot_name, joint_positions=[self.demo8_joint_value], backbone_SPs=backbone_SPs)
             return success
         else:
             return False
@@ -551,43 +558,43 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             return R, p 
         
 
-    def getBackboneWaypoints(self):
+    def getBackboneSPs(self):
         t = np.linspace(0, 2*np.pi*100, 20) # mm
-        waypoints = np.stack([
+        SPs = np.stack([
             t,
             np.sin(t)*1.2,
             t * 0.3
         ], axis=-1)  # shape (20, 3)
         # For one segment, shape should be (1, 20, 3)
-        return waypoints[np.newaxis, ...]  # shape (1, 20, 3)
+        return SPs[np.newaxis, ...]  # shape (1, 20, 3)
     
-    def getStraightBackboneWaypoints(self, length=200, num_points=20):
+    def getStraightBackboneSPs(self, length=200, num_points=20):
         z = np.linspace(0, length, num_points)
-        waypoints = np.stack([
+        SPs = np.stack([
             np.zeros_like(z),
             np.zeros_like(z),
             z
         ], axis=-1)  # shape (num_points, 3)
-        return waypoints[np.newaxis, ...]  # shape (1, num_points, 3)
+        return SPs[np.newaxis, ...]  # shape (1, num_points, 3)
     
-    def getArcBackboneWaypoints(self, radius=100, angle_span=np.pi/3, num_points=20, z_height=0):
+    def getArcBackboneSPs(self, radius=100, angle_span=np.pi/3, num_points=20, z_height=0):
         """
-        Generate waypoints for an arc in the XY-plane.
+        Generate SPs for an arc in the XY-plane.
         Args:
             radius: radius of the arc
             angle_span: total angle of the arc (radians)
-            num_points: number of waypoints along the arc
+            num_points: number of SPs along the arc
             z_height: constant z value for the arc
         Returns:
-            waypoints: shape (1, num_points, 3)
+            SPs: shape (1, num_points, 3)
         """
         theta = np.linspace(0, angle_span, num_points)
         x = radius * np.cos(theta)
         y = radius * np.sin(theta)
         z = np.full_like(theta, z_height)
-        waypoints = np.stack([x, y, z], axis=-1)  # (num_points, 3)
-        return waypoints[np.newaxis, ...]         # (1, num_points, 3)
-    def getPeriodicSweepingTubeWaypointsWithFixedRadius(self, radius=100, theta=np.pi/2, num_points=20):
+        SPs = np.stack([x, y, z], axis=-1)  # (num_points, 3)
+        return SPs[np.newaxis, ...]         # (1, num_points, 3)
+    def getPeriodicSweepingTubeSPsWithFixedRadius(self, radius=100, theta=np.pi/2, num_points=20):
 
  
         if theta == 0:
@@ -608,20 +615,20 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         y = x_arc * np.sin(rotate_angle) + y_arc * np.cos(rotate_angle)
         z = z_arc
         
-        waypoints = np.stack([x, y, z], axis=-1)  # (num_points, 3)
-        return waypoints[np.newaxis, ...] 
+        SPs = np.stack([x, y, z], axis=-1)  # (num_points, 3)
+        return SPs[np.newaxis, ...] 
     
-    def getPeriodicSweepingTubeWaypoints(self,time, length=200, theta_max=np.pi/2, num_points=5):
+    def getPeriodicSweepingTubeSPs(self,time, length=200, theta_max=np.pi/2, num_points=5):
         """
-        Generate waypoints for an elastic tube that sweeps back and forth periodically.
+        Generate SPs for an elastic tube that sweeps back and forth periodically.
         Args:
             time: current time (seconds)
             length: arc length of the tube
             max_radius: maximum radius of curvature (controls sweep amplitude)
             sweep_frequency: frequency of the sweep (Hz)
-            num_points: number of waypoints along the tube
+            num_points: number of SPs along the tube
         Returns:
-            waypoints: shape (1, num_points, 3)
+            SPs: shape (1, num_points, 3)
         """
         # Calculate the current sweep angle (oscillates between -max_angle and +max_angle)
         sweep_angle = theta_max * np.sin(2 * np.pi * time)  # ±45 degrees
@@ -643,8 +650,8 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         y = x_arc * np.sin(rotate_angle) + y_arc * np.cos(rotate_angle)
         z = z_arc
         
-        waypoints = np.stack([x, y, z], axis=-1)  # (num_points, 3)
-        return waypoints[np.newaxis, ...]         # (1, num_points, 3)
+        SPs = np.stack([x, y, z], axis=-1)  # (num_points, 3)
+        return SPs[np.newaxis, ...]         # (1, num_points, 3)
     
     def lengths2arc4(self, l, d):
         """
@@ -850,10 +857,10 @@ class UsageTemplateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         """
         kappa: curvature parameter (1/m)
         trajectory: list of (u1, u2, dt)
-        N: number of resampled waypoints
+        N: number of resampled SPs
 
         Returns:
-            Nx3 array of needle waypoints
+            Nx3 array of needle SPs
         """
         gs = []
         g = np.eye(4)

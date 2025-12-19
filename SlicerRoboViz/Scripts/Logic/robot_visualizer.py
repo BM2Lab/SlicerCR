@@ -40,10 +40,9 @@ class RobotStateNode:
     joint_positions: list[float] = []
     old_joint_positions: list[float] = []
     segment_names: list[str] = []
-    segment_waypoints: str = ""
-    old_segment_waypoints: str = ""
+    segment_SPs: str = "" # sample points
+    old_segment_SPs: str = ""
     segment_end_transforms: str = ""
-    segment_global_waypoints: str = ""
 
 class RobotVisualizer:
 
@@ -54,11 +53,11 @@ class RobotVisualizer:
         # Add performance optimization attributes
         self._cached_transforms = {}
         self._last_joint_positions = None
-        self._last_segment_waypoints = None
+        self._last_segment_SPs = None
         self._cached_vtk_matrices = {}
         self._rendering_enabled = True
         self.link_model_nodes = {}
-        self.disk_model_nodes = {}
+        self.vertebra_model_nodes = {}
         self.transform_nodes = []
         self.root_transform_nodes = {}
         self.robot = None
@@ -73,7 +72,7 @@ class RobotVisualizer:
         self.segment_mapping = {}
         self.rendering_manager = RenderingManager()
         self.state_parser = StateParser()
-        self.waypoint_fitter = WaypointFitter()
+        self.SP_fitter = WaypointFitter()
         # Initialize the parameter node
         
 
@@ -356,9 +355,9 @@ class RobotVisualizer:
     def _renderContinuumBodyInSlicer(self, robot, urdfFilePath):
         if robot.segments:
             lengths = [self.segment_mapping[segment.name]["initial_length"]*self.CONVERSION_SCALE for segment in robot.segments]
-            waypoint_data = self.state_parser.initializeWaypointData(lengths)
+            SP_data = self.state_parser.initializeWaypointData(lengths)
             was_modified = self.robot_state_node.StartModify()
-            self.updateSegmentState(waypoint_data)
+            self.updateSegmentState(SP_data)
             self.robot_state_node.EndModify(was_modified)
 
     def getTransformsHierarchy(self):
@@ -394,23 +393,16 @@ class RobotVisualizer:
         self.robot_state_node.time_stamp = time.time()
         # print("updateJointState called")
 
-    def updateSegmentState(self, backbone_waypoints: np.ndarray, end_transforms: np.ndarray=None):
-        if backbone_waypoints.shape[0] != len(self.robot_state_node.segment_names):
-            # qt.QMessageBox.critical(None, "Error", "Backbone waypoints length does not match segment names length.")
-            print(f"Backbone waypoints length does not match segment names length. {backbone_waypoints.shape[0]} != {len(self.robot_state_node.segment_names)}")
+    def updateSegmentState(self, backbone_SPs: np.ndarray, end_transforms: np.ndarray=None):
+        if backbone_SPs.shape[0] != len(self.robot_state_node.segment_names):
+            # qt.QMessageBox.critical(None, "Error", "Backbone sample points length does not match segment names length.")
+            print(f"Backbone sample points length does not match segment names length. {backbone_SPs.shape[0]} != {len(self.robot_state_node.segment_names)}")
             return
-        self.robot_state_node.old_segment_waypoints = self.robot_state_node.segment_waypoints
-        self.robot_state_node.segment_waypoints = str(backbone_waypoints.tolist())
-        # self.robot_state_node.segment_end_transforms = str(end_transforms.tolist()) if end_transforms is not None else ""
+        self.robot_state_node.old_segment_SPs = self.robot_state_node.segment_SPs
+        self.robot_state_node.segment_SPs = str(backbone_SPs.tolist())
+        self.robot_state_node.segment_end_transforms = str(end_transforms.tolist()) if end_transforms is not None else ""
         self.robot_state_node.time_stamp = time.time()
         # print("updateSegmentState called")
-
-    def clearCache(self):
-        """Clear all cached objects to free memory"""
-        self._cached_transforms.clear()
-        self._cached_vtk_matrices.clear()
-        self._last_joint_positions = None
-        self._last_segment_waypoints = None
 
     def __onStateUpdate(self, caller, event):
         # print("__onStateUpdate called")
@@ -453,13 +445,13 @@ class RobotVisualizer:
 
                 transformNode.SetMatrixTransformToParent(transform.GetMatrix())
         # print(f"Time spent in __onStateUpdate joint part: {(time.time() - start_time)*1000:.2f} ms")
-        # Optimize segment waypoint updates
-        old_segment_waypoints = self.robot_state_node.old_segment_waypoints
-        segment_waypoints = self.robot_state_node.segment_waypoints
+        # Optimize segment sample point updates
+        old_segment_SPs = self.robot_state_node.old_segment_SPs
+        segment_SPs = self.robot_state_node.segment_SPs
 
-        if old_joint_positions != joint_positions or old_segment_waypoints != segment_waypoints:
-            # backbone_waypoints = np.array(segment_waypoints)
-            backbone_waypoints = MathHelper.string2Array(segment_waypoints)
+        if old_joint_positions != joint_positions or old_segment_SPs != segment_SPs:
+            
+            backbone_SPs = MathHelper.string2Array(segment_SPs)
             segment_end_transforms = MathHelper.string2Array(self.robot_state_node.segment_end_transforms)
             
             # Pre-compute common values
@@ -471,17 +463,19 @@ class RobotVisualizer:
                     segment = segments[i]
                     segment_data = self.segment_mapping[segment.name]
                     if len(segment_data["model_nodes"]) == 0:
-                        for idx_unit in range(len(segment.continuum_body.continuum_units)):
+                        for idx_unit,unit in enumerate(segment.continuum_body.continuum_units):
                             model_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode", f"{segment.name}_continuum_unit_{idx_unit}")
                             model_node.SetAndObserveTransformNodeID(segment_data["transform_node(start)"].GetID())
                             model_node.CreateDefaultDisplayNodes()
+                            model_node.GetDisplayNode().SetColor(unit.color.rgba[0], unit.color.rgba[1], unit.color.rgba[2])
+                            model_node.GetDisplayNode().SetOpacity(unit.color.rgba[3])
                             segment_data["model_nodes"].append(model_node)
                     start_transform_node = segment_data["transform_node(start)"]
                     # Handle end transforms
                     
                     if  segment_end_transforms is None:
-                        _, _, end_poses = self.waypoint_fitter.getIntermediatePoses(
-                            self.default_segment_direction, self.Euler_ANGLE_ORDER, backbone_waypoints[i], self.default_u_new
+                        _, _, end_poses = self.SP_fitter.getIntermediatePoses(
+                            self.default_segment_direction, self.Euler_ANGLE_ORDER, backbone_SPs[i], self.default_u_new
                         )
                         end_pose = MathHelper.npMatrixToVtkMatrix(end_poses[0])
                         self.segment_mapping[segment.name]["transform_node(end)"].SetMatrixTransformToParent(end_pose)
@@ -489,60 +483,51 @@ class RobotVisualizer:
                         end_pose = MathHelper.npMatrixToVtkMatrix(np.array(segment_end_transforms[i].squeeze()))
                         self.segment_mapping[segment.name]["transform_node(end)"].SetMatrixTransformToParent(end_pose)
                     
-                    # Optimize mesh disk rendering
                     
-                    if segment.disks and segment.disks.geometry.type == 'mesh':
-                        self._updateMeshDisks(segment, backbone_waypoints[i], start_transform_node)
+                    if segment.vertebrae and segment.vertebrae.geometry.type == 'mesh':
+                        self._updateVertebrae(segment, backbone_SPs[i], start_transform_node)
                     
-                    # Update continuum units
-                    self._updateContinuumUnits(segment, self.vtk_matrix_base, backbone_waypoints[i])
-                    # need function to update the polydata in the model node
-                    # Handle cylinder disks
-                    if segment.disks and segment.disks.geometry.type == 'cylinder':
-                        self._updateCylinderDisks(segment, backbone_waypoints[i])
+                    self._updateContinuumUnits(segment, self.vtk_matrix_base, backbone_SPs[i])
+
             finally:
                 
-                self.robot_state_node_was_modified = self.robot_state_node.StartModify()
-                self.robot_state_node.segment_global_waypoints = str(backbone_waypoints.tolist())
-                
-                # self.rendering_helper.show(self.robot)
                 self.rendering_manager.show(self.robot, self.segment_mapping)
             
             
 
         # print(f"Time spent in __onStateUpdate segment part: {(time.time() - start_time)*1000:.2f} ms")
 
-    def _updateMeshDisks(self, segment, backbone_waypoint, start_transform_node):
-        """Optimized mesh disk update"""
+    def _updateVertebrae(self, segment, backbone_SPs, start_transform_node):
+        """Optimized vertebrae update"""
         
-        disk_span = segment.disks.span or [0, 1]
-        u_new = np.linspace(disk_span[0], disk_span[1], segment.disks.count)
+        vertebra_span = segment.vertebrae.span or [0, 1]
+        u_new = np.linspace(vertebra_span[0], vertebra_span[1], segment.vertebrae.count)
         
-        disk_centers, disk_directions, transform_matrices = self.waypoint_fitter.getIntermediatePoses(
-            self.default_mesh_direction, self.Euler_ANGLE_ORDER, backbone_waypoint, u_new
+        vertebra_centers, vertebra_directions, transform_matrices = self.SP_fitter.getIntermediatePoses(
+            self.default_mesh_direction, self.Euler_ANGLE_ORDER, backbone_SPs, u_new
         )
         
-        for j in range(segment.disks.count):
-            model_name = f"{segment.name}_disk_{j}"
+        for j in range(segment.vertebrae.count):
+            model_name = f"{segment.name}_vertebra_{j}"
             
-            if model_name in self.disk_model_nodes:
+            if model_name in self.vertebra_model_nodes:
 
-                disk_model_node_transform_node = self.disk_model_nodes[model_name+"_transform_node"]
+                vertebra_model_node_transform_node = self.vertebra_model_nodes[model_name+"_transform_node"]
                 transform_matrix = transform_matrices[j]
                 transform_matrix[:3,:3] = transform_matrix[:3,:3]*self.CONVERSION_SCALE
-                disk_model_node_transform_node.SetMatrixTransformToParent(MathHelper.npMatrixToVtkMatrix(transform_matrix))
+                vertebra_model_node_transform_node.SetMatrixTransformToParent(MathHelper.npMatrixToVtkMatrix(transform_matrix))
             else:
                 # Create new model
-                meshFilePath = os.path.normpath(os.path.join(self.urdf_dir, segment.disks.geometry.filename))
-                disk_model_node, disk_model_node_transform_node = self._renderMeshInSlicer(
-                    meshFilePath, model_name, disk_centers[j], disk_directions[j], 
-                    segment.disks.color.rgba, scale=self.CONVERSION_SCALE
+                meshFilePath = os.path.normpath(os.path.join(self.urdf_dir, segment.vertebrae.geometry.filename))
+                vertebra_model_node, vertebra_model_node_transform_node = self._renderMeshInSlicer(
+                    meshFilePath, model_name, vertebra_centers[j], vertebra_directions[j], 
+                    segment.vertebrae.color.rgba, scale=self.CONVERSION_SCALE
                 )
-                disk_model_node_transform_node.SetAndObserveTransformNodeID(start_transform_node.GetID())
-                self.disk_model_nodes[model_name] = disk_model_node
-                self.disk_model_nodes[model_name+"_transform_node"] = disk_model_node_transform_node
+                vertebra_model_node_transform_node.SetAndObserveTransformNodeID(start_transform_node.GetID())
+                self.vertebra_model_nodes[model_name] = vertebra_model_node
+                self.vertebra_model_nodes[model_name+"_transform_node"] = vertebra_model_node_transform_node
 
-    def _updateContinuumUnits(self, segment, vtk_matrix_world, backbone_waypoint):
+    def _updateContinuumUnits(self, segment, vtk_matrix_world, backbone_SPs):
         """Optimized continuum unit update"""
 
         configs = []
@@ -553,25 +538,11 @@ class RobotVisualizer:
                 config = [unit.offset*self.CONVERSION_SCALE, unit.angle]
             configs.append(config)
         
-        waypoints = self.waypoint_fitter.getContinuumUnitWaypoints(vtk_matrix_world, backbone_waypoint, configs)
-        for unit, waypoint in zip(segment.continuum_body.continuum_units, waypoints):
-            unit.trajectory = waypoint
+        unit_SPs = self.SP_fitter.getContinuumUnitWaypoints(vtk_matrix_world, backbone_SPs, configs)
+        for unit, SPs in zip(segment.continuum_body.continuum_units, unit_SPs):
+            unit.trajectory = SPs
 
 
-    def _updateCylinderDisks(self, segment, backbone_waypoint):
-        """Optimized cylinder disk update"""
-        start_time = time.time()
-        disk_count = segment.disks.count
-        disk_span = segment.disks.span or [0, 1]
-        u_new = np.linspace(disk_span[0], disk_span[1], disk_count)
-        default_vtk_cylinder_direction = np.array([0, 1, 0])
-        disk_centers, disk_directions, _ = self.waypoint_fitter.getIntermediatePoses(
-            default_vtk_cylinder_direction, 'ZXY', backbone_waypoint, u_new
-        )
-        segment.disks.centers = disk_centers
-        segment.disks.directions = disk_directions
-        end_time = time.time()
-        # print(f"Time spent in _updateCylinderDisks: {(end_time - start_time)*1000:.2f} ms")     
     #####################################
     ####### attribute access #############
     #####################################
@@ -586,7 +557,7 @@ class RobotVisualizer:
 
     @property
     def segment_global_waypoints(self):
-        return MathHelper.string2Array(self.robot_state_node.segment_global_waypoints)
+        return None
     
     ######################################
     ############## Cleanup ###############
@@ -604,22 +575,21 @@ class RobotVisualizer:
         for transformNode in self.transform_nodes:
             if transformNode:
                 slicer.mrmlScene.RemoveNode(transformNode)
-        for disk_model_node in self.disk_model_nodes.values():
-            if disk_model_node:
-                slicer.mrmlScene.RemoveNode(disk_model_node)
+        for vertebra_model_node in self.vertebra_model_nodes.values():
+            if vertebra_model_node:
+                slicer.mrmlScene.RemoveNode(vertebra_model_node)
         for segment_data in self.segment_mapping.values():
             for model_node in segment_data["model_nodes"]:
                 if model_node:
                     slicer.mrmlScene.RemoveNode(model_node)
         self.joint_mapping.clear()
         self.link_model_nodes.clear()
-        self.disk_model_nodes.clear()
+        self.vertebra_model_nodes.clear()
         self.root_transform_nodes.clear()
         self.transform_nodes.clear()
         self.segment_mapping.clear()
         self.robot = None
         self.robot_description_node = None
         self.robot_state_node = None
-        self.rendering_helper.clear()
         print("RobotVisualizer cleanup completed.")
     

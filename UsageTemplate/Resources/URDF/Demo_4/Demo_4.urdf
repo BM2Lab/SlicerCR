@@ -52,12 +52,12 @@
             </continuum_unit>
         </continuum_body> 
 
-        <disks count="11" span = "0 1">
+        <vertebrae count="11" span = "0 1">
             <color rgba="1.0 0.42 0.21 1.0"/>
             <geometry>
                 <mesh filename="meshes/ring_extrusion_10mm.stl"/>
             </geometry>
-        </disks>
+        </vertebrae>
 
     </segment>
 
@@ -72,13 +72,13 @@
                 </continuum_unit>
             </continuum_body> 
 
-            <disks count="16" span = "0 1">
+            <vertebrae count="16" span = "0 1">
             <color rgba="0.74 0.76 0.78 1.0"/>
             <geometry>
              
                 <mesh filename="meshes/ring_extrusion_8mm.stl"/>
             </geometry>
-        </disks>
+        </vertebrae>
 
     </segment>
 
@@ -94,13 +94,13 @@
             </continuum_body> 
 
 
-        <disks count="8" span = "0 1">
+        <vertebrae count="8" span = "0 1">
             <color rgba="0.74 0.76 0.78 1.0"/>
             <geometry>
              
                 <mesh filename="meshes/ring_extrusion_8mm.stl"/>
             </geometry>
-        </disks>
+        </vertebrae>
 
     </segment>
 

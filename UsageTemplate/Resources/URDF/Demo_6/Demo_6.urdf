@@ -54,12 +54,12 @@
                     <color rgba="0.1 0.1 0.1 1"/>
                 </continuum_unit>
             </continuum_body>
-            <disks count="4" span = "0.2 0.8">
+            <vertebrae count="4" span = "0.2 0.8">
             <color rgba="1.0 0.42 0.21 1.0"/>
             <geometry>
                 <mesh filename="meshes/Guide_1.STL"/>
             </geometry>
-            </disks>
+            </vertebrae>
 
         </segment>
 
@@ -137,12 +137,12 @@
                 </continuum_unit>
             </continuum_body>
 
-            <disks count="4" span = "0.2 0.8">
+            <vertebrae count="4" span = "0.2 0.8">
             <color rgba="1.0 0.42 0.21 1.0"/>
             <geometry>
                 <mesh filename="meshes/Guide_2.STL"/>
             </geometry>
-            </disks>
+            </vertebrae>
 
         </segment>
 
@@ -207,12 +207,12 @@
                 </continuum_unit>
             </continuum_body>
 
-            <disks count="4" span = "0.2 0.8">
+            <vertebrae count="4" span = "0.2 0.8">
             <color rgba="1.0 0.42 0.21 1.0"/>
             <geometry>
                 <mesh filename="meshes/Guide_3.STL"/>
             </geometry>
-            </disks>
+            </vertebrae>
 
     </segment>
 

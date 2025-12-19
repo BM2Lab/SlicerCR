@@ -11,13 +11,9 @@ class RenderingManager():
         
     def __init__(self) -> None:
         """Called when the logic class is instantiated. Can be used for initializing member variables."""
-        self.renderer = slicer.app.layoutManager().threeDWidget(0).threeDView().renderWindow().GetRenderers().GetFirstRenderer()
-        self.actors = []
+
         self.conversion_scale = 1000
         self.sides = 20
-        self._actor_cache = {}
-        self.is_actor_initialized = False
-        pass
         
 
     def show(self,robot,segment_mapping):
@@ -40,12 +36,8 @@ class RenderingManager():
                                             sides=self.sides)
                                             
                     model_node.SetAndObservePolyData(polydata)
-                    model_node.GetDisplayNode().SetColor(unit.color.rgba[0], unit.color.rgba[1], unit.color.rgba[2])
-                    model_node.GetDisplayNode().SetOpacity(unit.color.rgba[3])
 
 
-
-    
     def createTubePolyData(self,trajectory, radius=3, sides=50):
         '''
         Create a tube polydata from a trajectory.

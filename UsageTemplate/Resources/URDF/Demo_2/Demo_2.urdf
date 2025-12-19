@@ -25,12 +25,12 @@
         
         </continuum_body> 
 
-        <disks count="12">
+        <vertebrae count="12">
             <color rgba="1.0 0.42 0.21 1.0"/>
             <geometry>
                 <mesh filename="meshes/disk.STL"/>
             </geometry>
-        </disks>
+        </vertebrae>
 
     </segment>
 
