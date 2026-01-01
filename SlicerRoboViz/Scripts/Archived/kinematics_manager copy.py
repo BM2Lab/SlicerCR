@@ -3,34 +3,34 @@ from scipy.spatial.transform import Rotation as R
 import slicer
 from Scripts.Utils.math_helper import MathHelper
 
-class TransformManager:
+class KinematicsManager:
     CONVERSION_SCALE = 1000
     Euler_ANGLE_ORDER = 'xyz'
     def __init__(self,robot_manager):
         self.robot_manager = robot_manager
-        self.joint_transform_mapping = {}
-        self.segment_transform_mapping = {}
+        self.joint_transform_container = {}
+        self.segment_transform_container = {}
         self.root_transform_nodes = {}
         self.transform_nodes = []
 
     def setupTransformHierarchy(self):
-        self.setupMapping()
+        self.setup()
         self.buildJointTransforms()
         self.ensureJointParents()
         self.buildSegmentTransforms()
         self.ensureSegmentParents()
     
-    def setupMapping(self):
+    def setup(self):
         """Setup the mapping for the joints and segments"""
 
         for index, joint in enumerate(self.robot_manager.robot.joints):
-            self.joint_transform_mapping[joint.name] = {
+            self.joint_transform_container[joint.name] = {
                 "index": index,
                 "transform_node": None,
                 "initial_transform": None
             }
         for index, segment in enumerate(self.robot_manager.robot.segments):
-            self.segment_transform_mapping[segment.name] = {
+            self.segment_transform_container[segment.name] = {
                 "index": index,
                 "transform_node": None,
                 "transform_node(start)": None,
@@ -43,8 +43,8 @@ class TransformManager:
 
         for joint in self.robot_manager.robot.joints:
             initialTransform, transformNode = self.createJointTransform(joint)
-            self.joint_transform_mapping[joint.name]["initial_transform"] = initialTransform
-            self.joint_transform_mapping[joint.name]["transform_node"] = transformNode
+            self.joint_transform_container[joint.name]["initial_transform"] = initialTransform
+            self.joint_transform_container[joint.name]["transform_node"] = transformNode
             self.attachJointVisual(joint, transformNode)
             self.connectJointToParent(joint, transformNode)
 
@@ -65,7 +65,7 @@ class TransformManager:
         
         joint_parent_name, _ = self.findParentJointbyChildLink(joint.parent)
         if joint_parent_name: # if the joint has a parent, connect the joint to the parent
-            parent_transform_node = self.joint_transform_mapping[joint_parent_name]["transform_node"]
+            parent_transform_node = self.joint_transform_container[joint_parent_name]["transform_node"]
             if parent_transform_node:
                 transformNode.SetAndObserveTransformNodeID(parent_transform_node.GetID())
                 print(f"Attached {joint.name}_Transform to {joint.parent}_Transform")
@@ -95,9 +95,9 @@ class TransformManager:
         for joint in self.robot_manager.robot.joints:
             parent_joint_name, _ = self.findParentJointbyChildLink(joint.parent)
             if parent_joint_name:
-                parent_transform_node = self.joint_transform_mapping[parent_joint_name]["transform_node"]
+                parent_transform_node = self.joint_transform_container[parent_joint_name]["transform_node"]
                 if parent_transform_node:
-                    joint.transform_node.SetAndObserveTransformNodeID(parent_transform_node.GetID())
+                    self.joint_transform_container[joint.name]["transform_node"].SetAndObserveTransformNodeID(parent_transform_node.GetID())
 
     def buildSegmentTransforms(self):
         for segment in self.robot_manager.robot.segments:
@@ -109,9 +109,9 @@ class TransformManager:
         """
 
         for segment in self.robot_manager.robot.segments:
-            if segment.parent in self.segment_transform_mapping:
-                parent_end_transform_node = self.segment_transform_mapping[segment.parent]["transform_node(end)"]
-                start_transform_node = self.segment_transform_mapping[segment.name]["transform_node(start)"]
+            if segment.parent in self.segment_transform_container:
+                parent_end_transform_node = self.segment_transform_container[segment.parent]["transform_node(end)"]
+                start_transform_node = self.segment_transform_container[segment.name]["transform_node(start)"]
                 if parent_end_transform_node and start_transform_node:
                     start_transform_node.SetAndObserveTransformNodeID(parent_end_transform_node.GetID())
                     print(f"Attached {segment.name}_Transform to {segment.parent}_Transform")
@@ -139,18 +139,21 @@ class TransformManager:
         return vtk_matrix
 
 
-    def getOrCreateRootTransform(self, link_name):
+    def getOrCreateRootTransform(self, name,type="link"):
         """Get or create the root transform node for the uppermost parent link"""
-
-        node_name = f"{self.robot_manager.robot_name}_{link_name}_Transform(root)"
+        if type == "link":
+           node_name = f"{self.robot_manager.robot_name}_{name}_Transform(root)"
+        elif type == "segment":
+            node_name = f"{name}_Transform(root)"
         root_node = slicer.mrmlScene.GetFirstNodeByName(node_name)
         if not root_node:
             root_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTransformNode", node_name)
-            self.root_transform_nodes[link_name] = root_node
+            self.root_transform_nodes[name] = root_node
         return root_node
 
     def attachLinkVisualToRoot(self, linkName, rootNode):
-        modelNode = self.link_model_nodes.get(linkName)
+        #TODO: check if this is correct.
+        modelNode = self.robot_manager.link_model_nodes.get(linkName)
         if not modelNode:
             return
         visualTransformNode = modelNode.GetParentTransformNode()
@@ -164,28 +167,29 @@ class TransformManager:
             initialTransform = self.getOriginTransform(segment.origin.xyz, segment.origin.rpy)
         else:
             initialTransform = self.getOriginTransform([0, 0, 0], [0, 0, 0])
-        self.segment_transform_mapping[segment.name]["initial_transform"] = initialTransform
+        self.segment_transform_container[segment.name]["initial_transform"] = initialTransform
         # Transform node for the start point of a segment
         start_transform_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTransformNode", f"{segment.name}_Transform(start)")
         start_transform_node.SetMatrixTransformToParent(initialTransform)
-        self.segment_transform_mapping[segment.name]["transform_node(start)"] = start_transform_node
+        self.segment_transform_container[segment.name]["transform_node(start)"] = start_transform_node
         # Transform node for the end point of a segment
         end_transform_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTransformNode", f"{segment.name}_Transform(end)")
         end_transform_node.SetAndObserveTransformNodeID(start_transform_node.GetID())
-        self.segment_transform_mapping[segment.name]["transform_node(end)"] = end_transform_node
+        self.segment_transform_container[segment.name]["transform_node(end)"] = end_transform_node
         return start_transform_node, end_transform_node
 
     def connectSegmentToParent(self, segment, start_transform_node):
         """Connect the segment to the parent segment"""
 
         segment_parent_name = segment.parent
-        if segment_parent_name in self.segment_transform_mapping:
-            parent_end_transform_node = self.segment_transform_mapping[segment_parent_name]["transform_node(end)"]
+        if segment_parent_name in self.segment_transform_container:
+            parent_end_transform_node = self.segment_transform_container[segment_parent_name]["transform_node(end)"]
             if parent_end_transform_node:
                 start_transform_node.SetAndObserveTransformNodeID(parent_end_transform_node.GetID())
                 print(f"Attached {segment.name}_Transform to {segment_parent_name}_Transform")
             return
-        root_transform_node = self.getOrCreateRootTransform(segment_parent_name)
+        # If no parent segment, the segment is the uppermost parent segment,
+        root_transform_node = self.getOrCreateRootTransform(segment_parent_name,type="segment")
         self.root_transform_nodes[segment_parent_name] = root_transform_node
         start_transform_node.SetAndObserveTransformNodeID(root_transform_node.GetID())
         print(f"Set {segment_parent_name} as root")
@@ -202,19 +206,26 @@ class TransformManager:
         self.convertInitialTransforms()
 
     def connectJointandSegment(self):
-        """The Joint hierarchy and segment hierarchy are separated, we need to connect them"""
+        """The Joint hierarchy and segment hierarchy are separated, we need to connect them.
+            The self.root_transform_nodes store the parent name and the root transform node.
+            In some cases, the parent name of a segment is in the joint_transform_container, and vice versa.
+            We need to connect them together.
+        """
 
         for parent_name, root_node in list(self.root_transform_nodes.items()):
-            if parent_name in self.segment_transform_mapping:
-                parent_end_transform_node = self.segment_transform_mapping[parent_name]["transform_node(end)"]
+            if parent_name in self.segment_transform_container:
+                parent_end_transform_node = self.segment_transform_container[parent_name]["transform_node(end)"]
                 if parent_end_transform_node:
                     root_node.SetAndObserveTransformNodeID(parent_end_transform_node.GetID())
                     self.root_transform_nodes.pop(parent_name)
                     continue
-            if parent_name in self.joint_transform_mapping:
-                parent_transform_node = self.joint_transform_mapping[parent_name]["transform_node"]
-                if parent_transform_node:
-                    root_node.SetAndObserveTransformNodeID(parent_transform_node.GetID())
+            if parent_name in self.robot_manager.link_model_nodes:
+                joint_name, _ = self.findParentJointbyChildLink(parent_name)
+                print(f"connect segment to joint: {joint_name}")
+                
+                if joint_name:
+                    parent_joint_transform_node = self.joint_transform_container[joint_name]["transform_node"]
+                    root_node.SetAndObserveTransformNodeID(parent_joint_transform_node.GetID())
                     self.root_transform_nodes.pop(parent_name)
 
     def collectTransformSubtree(self):
@@ -237,9 +248,9 @@ class TransformManager:
             matrix = vtk.vtkMatrix4x4()
             node.GetMatrixTransformToParent(matrix)
             node.SetMatrixTransformToParent(MathHelper.convert2SlicerTransform(matrix))
-        for mapping in self.joint_transform_mapping.values():
+        for mapping in self.joint_transform_container.values():
             mapping["initial_transform"] = MathHelper.convert2SlicerTransform(mapping["initial_transform"])
-        for mapping in self.segment_transform_mapping.values(): #TODO: check if this is correct
+        for mapping in self.segment_transform_container.values(): #TODO: check if this is correct
             mapping["initial_transform"] = MathHelper.convert2SlicerTransform(mapping["initial_transform"])
     
     ######################################################
@@ -248,11 +259,22 @@ class TransformManager:
 
         transforms_hierarchy = {}
         transforms_hierarchy[list(self.root_transform_nodes.keys())[0]] = list(self.root_transform_nodes.values())[0]
-        for joint_name, mapping in self.joint_transform_mapping.items():
+        for joint_name, mapping in self.joint_transform_container.items():
             transforms_hierarchy[joint_name] = mapping["transform_node"]
-        for segment_name, mapping in self.segment_transform_mapping.items():
+        for segment_name, mapping in self.segment_transform_container.items():
             segment_transform_node_end = mapping["transform_node(end)"]
             segment_transform_node_start = mapping["transform_node(start)"]
             transforms_hierarchy[segment_name] = {"end": segment_transform_node_end, "start": segment_transform_node_start}
         return transforms_hierarchy
+    
+    ######################################################
+    def cleanUp(self):
+        """Clean up the transform hierarchy"""
+        for transformNode in self.transform_nodes:
+            if transformNode:
+                slicer.mrmlScene.RemoveNode(transformNode)
+        self.root_transform_nodes = {}
+        self.transform_nodes = []
+        self.joint_transform_container = {}
+        self.segment_transform_container = {}
        

@@ -19,6 +19,7 @@ from slicer.parameterNodeWrapper import (
 import qt
 from slicer import vtkMRMLScalarVolumeNode
 from Scripts.Logic.robot_visualizer import RobotVisualizer
+from Scripts.Logic.robot_nodes import RobotNode
 import numpy as np
 import csv
 from datetime import datetime
@@ -237,18 +238,7 @@ class SlicerRoboVizWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         pass
 
 
-@parameterNodeWrapper
-class JointStateNode:
-    """Parameter node wrapper for joint states."""
-    time_stamp: float = 0.0
-    joint_names: list[str] = []
-    joint_positions: list[float] = []
 
-@parameterNodeWrapper
-class RobotNode:
-    """Parameter node wrapper for robot."""
-    robot_names: list[str] = []
-    urdf_file_paths: list[str] = []
 
 
 #

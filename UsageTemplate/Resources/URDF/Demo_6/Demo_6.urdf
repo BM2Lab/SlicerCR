@@ -19,6 +19,25 @@
     </visual>
   </link>
 
+  <joint
+    name="base_to_segment_1_joint"
+    type="revolute">
+    <origin
+      xyz="0 0 0.0"
+      rpy="0 0 0" />
+    <parent
+      link="base" />
+    <child
+      link="segment_1" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="0"
+      effort="0"
+      velocity="0" />
+  </joint>
+
 
     <segment name="segment_1">
             <parent name="base"/>
@@ -64,7 +83,7 @@
         </segment>
 
   <joint
-    name="middle_proximal_rot_joint"
+    name="segment_1_to_middle_proximal_link_joint"
     type="revolute">
     <origin
       xyz="0 0 0.0"
@@ -100,7 +119,24 @@
     </visual>
   </link>
 
-
+    <joint
+    name="middle_proximal_link_to_segment_2_joint"
+    type="revolute">
+    <origin
+      xyz="0 0 0.0"
+      rpy="0 0 0" />
+    <parent
+      link="middle_proximal_link" />
+    <child
+      link="segment_2" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="0"
+      effort="0"
+      velocity="0" />
+  </joint>
 
    <segment name="segment_2">
             <parent name="middle_proximal_link"/>
@@ -146,8 +182,8 @@
 
         </segment>
 
-         <joint
-    name="middle_proximal_2_rot_joint"
+  <joint
+    name="segment_2_to_middle_proximal_2_link_joint"
     type="revolute">
     <origin
       xyz="0 0 0.0"
@@ -182,7 +218,25 @@
       </material>
     </visual>
   </link>
-
+    
+    <joint
+    name="middle_proximal_2_link_to_segment_3_joint"
+    type="revolute">
+    <origin
+      xyz="0 0 0.0"
+      rpy="0 0 0" />
+    <parent
+      link="middle_proximal_2_link" />
+    <child
+      link="segment_3" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="0"
+      effort="0"
+      velocity="0" />
+  </joint>
 
    <segment name="segment_3">
             <parent name="middle_proximal_2_link"/>
@@ -217,7 +271,7 @@
     </segment>
 
     <joint
-    name="middle_to_top_joint"
+    name="segment_3_to_top_link_joint"
     type="revolute">
     <origin
       xyz="0 0 0.0"
@@ -254,3 +308,4 @@
   </link>
 
 </robot>
+

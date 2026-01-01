@@ -15,22 +15,35 @@ class RenderingManager():
         self.conversion_scale = 1000
         self.sides = 20
         
-
-    def show(self,robot,segment_mapping):
+    # def show(self,robot,segment_mapping):
+    #     self._updateModelNode(robot,segment_mapping)
+    def show(self,robot,segment_model_nodes):
         
-        self._updateModelNode(robot,segment_mapping)
+        self._updateModelNode(robot,segment_model_nodes)
         
+    # def _updateModelNode(self,robot,segment_mapping):
+    #     '''
+    #     Initialize the model node for continuum units.
+    #     '''
+    #     for segment in robot.segments:
+    #         if segment.continuum_body.continuum_units:
+    #             for idx, unit in enumerate(segment.continuum_body.continuum_units):
+    #                 model_node = segment_mapping[segment.name]["model_nodes"][idx]
+    #                 polydata = self.createTubePolyData(unit.trajectory, 
+    #                                         radius=unit.radius*self.conversion_scale, 
+    #                                         sides=self.sides)
+                                            
+    #                 model_node.SetAndObservePolyData(polydata)
 
 
-
-    def _updateModelNode(self,robot,segment_mapping):
+    def _updateModelNode(self,robot,segment_model_nodes):
         '''
         Initialize the model node for continuum units.
         '''
         for segment in robot.segments:
             if segment.continuum_body.continuum_units:
                 for idx, unit in enumerate(segment.continuum_body.continuum_units):
-                    model_node = segment_mapping[segment.name]["model_nodes"][idx]
+                    model_node = segment_model_nodes[segment.name][idx]
                     polydata = self.createTubePolyData(unit.trajectory, 
                                             radius=unit.radius*self.conversion_scale, 
                                             sides=self.sides)

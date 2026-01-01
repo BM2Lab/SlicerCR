@@ -15,9 +15,7 @@ from Dependencies.urdf_parser_py.urdf import URDF_continuum
 class RobotLoader:
     def __init__(self):
         # Mapping of joints and segments
-        self.joint_mapping = {}
-        self.segment_mapping = {}
-        
+
         self._cached_transforms = {}
         self._last_joint_positions = None
         self._last_segment_waypoints = None

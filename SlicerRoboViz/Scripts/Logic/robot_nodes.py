@@ -20,7 +20,13 @@ class RobotStateNode:
     joint_positions: list[float] = []
     old_joint_positions: list[float] = []
     segment_names: list[str] = []
-    segment_waypoints: str = ""
-    old_segment_waypoints: str = ""
+    segment_SPs: str = "" # sample points
+    old_segment_SPs: str = ""
     segment_end_transforms: str = ""
-    segment_global_waypoints: str = ""
+
+
+@parameterNodeWrapper
+class RobotNode:
+    """Parameter node wrapper for robot."""
+    robot_names: list[str] = []
+    urdf_file_paths: list[str] = []
