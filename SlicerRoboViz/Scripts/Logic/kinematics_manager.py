@@ -33,7 +33,6 @@ class KinematicsManager:
         for index, segment in enumerate(self.robot_manager.robot.segments):
             self.segment_transform_container[segment.name] = {
                 "index": index,
-                "transform_node": None,
                 "transform_node(start)": None,
                 "transform_node(end)": None,
                 "initial_transform": None

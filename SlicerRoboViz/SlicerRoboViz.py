@@ -18,7 +18,7 @@ from slicer.parameterNodeWrapper import (
 )
 import qt
 from slicer import vtkMRMLScalarVolumeNode
-from Scripts.Logic.robot_visualizer import RobotVisualizer
+from Scripts.Logic.robot_manager import RobotManager
 from Scripts.Logic.robot_nodes import RobotNode
 import numpy as np
 import csv
@@ -259,7 +259,7 @@ class SlicerRoboVizLogic(ScriptedLoadableModuleLogic):
     def __init__(self) -> None:
         """Called when the logic class is instantiated. Can be used for initializing member variables."""
         ScriptedLoadableModuleLogic.__init__(self)
-        self.robot_visualizers = {}
+        self.robot_managers = {}
         
         # Initialize robot node
         parameter_node = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScriptedModuleNode')
@@ -270,127 +270,127 @@ class SlicerRoboVizLogic(ScriptedLoadableModuleLogic):
 
     def _getRobotNameFromPath(self, path: str) -> Optional[str]:
         """Get the robot name from the path if it exists."""
-        for key, robot_data in self.robot_visualizers.items():
+        for key, robot_data in self.robot_managers.items():
             if robot_data["path"] == path:
                 return robot_data["robot_name"]
         return None
     
     def __getRobotFromNumber(self, robot_number: int) -> Optional[str]:
         """Get the robot name from the number if it exists."""
-        for key, robot_data in self.robot_visualizers.items():
+        for key, robot_data in self.robot_managers.items():
             if f"robot_{robot_number}" in key:
                 return key
         return None
     
     def isRobotLoaded(self, robot_name: str) -> bool:
-        return self.robot_visualizers.get(robot_name) is not None
-    # we need to link visualizer to each robot panel instead of path
+        return self.robot_managers.get(robot_name) is not None
+    
 
     def loadRobot(self, urdf_file_path: str, robot_number: int) -> bool:
         """Load a robot from a URDF file and render it in the scene."""    
         # try:
         if not self.__getRobotFromNumber(robot_number): #TODO update the exisiting robot
             
-            robot_visualizer = RobotVisualizer()
-            robot_visualizer.visualizeRobot(urdf_file_path)
+            robot_manager = RobotManager()
+            robot_manager.initializeRobot(urdf_file_path)
             # avoid duplicate robot name
-            if self.__getVisualizerFromName(robot_visualizer.robot_name):
-                qt.QMessageBox.critical(None, "Error", f"Robot {robot_visualizer.robot_name} already loaded")
+            if self.__getManagerFromName(robot_manager.robot_name):
+                qt.QMessageBox.critical(None, "Error", f"Robot {robot_manager.robot_name} already loaded")
                 return False
-            self.robot_visualizers[f"robot_{robot_number}"] = {
+            self.robot_managers[f"robot_{robot_number}"] = {
                 "path": urdf_file_path,
                 "robot_number": robot_number,
-                "robot_name": robot_visualizer.robot_name,
-                "visualizer": robot_visualizer
+                "robot_name": robot_manager.robot_name,
+                "manager": robot_manager
             }
-            self.robot_node.robot_names.append(robot_visualizer.robot_name)
+            self.robot_node.robot_names.append(robot_manager.robot_name)
             self.robot_node.urdf_file_paths.append(urdf_file_path)
         else:
-            robot_visualizer = self.robot_visualizers[f"robot_{robot_number}"]["visualizer"]
-            robot_visualizer.cleanup()
-            robot_visualizer.visualizeRobot(urdf_file_path)
-            if self.robot_visualizers[f"robot_{robot_number}"]["path"] != urdf_file_path:
-                self.robot_node.urdf_file_paths.remove(self.robot_visualizers[f"robot_{robot_number}"]["path"])
+            robot_manager = self.robot_managers[f"robot_{robot_number}"]["manager"]
+            robot_manager.cleanup()
+            robot_manager.initializeRobot(urdf_file_path)
+            if self.robot_managers[f"robot_{robot_number}"]["path"] != urdf_file_path:
+                self.robot_node.urdf_file_paths.remove(self.robot_managers[f"robot_{robot_number}"]["path"])
                 self.robot_node.urdf_file_paths.append(urdf_file_path)
-                self.robot_visualizers[f"robot_{robot_number}"]["path"] = urdf_file_path
+                self.robot_managers[f"robot_{robot_number}"]["path"] = urdf_file_path
                 
-            if self.robot_visualizers[f"robot_{robot_number}"]["robot_name"] != robot_visualizer.robot_name:
-                self.robot_node.robot_names.remove(self.robot_visualizers[f"robot_{robot_number}"]["robot_name"])
-                self.robot_node.robot_names.append(robot_visualizer.robot_name)
-                self.robot_visualizers[f"robot_{robot_number}"]["robot_name"] = robot_visualizer.robot_name
-            print(f"Robot {robot_visualizer.robot_name} updated")
+            if self.robot_managers[f"robot_{robot_number}"]["robot_name"] != robot_manager.robot_name:
+                self.robot_node.robot_names.remove(self.robot_managers[f"robot_{robot_number}"]["robot_name"])
+                self.robot_node.robot_names.append(robot_manager.robot_name)
+                self.robot_managers[f"robot_{robot_number}"]["robot_name"] = robot_manager.robot_name
+            print(f"Robot {robot_manager.robot_name} updated")
         return True
         # except Exception as e:
         #     qt.QMessageBox.critical(None, "Error", f"Failed to load robot: {str(e)}")
         #     return False
         
     # methods for update the robot
-    def __getVisualizerFromName(self, robot_name:str) -> Optional[RobotVisualizer]:
-        """Find the visualizer from the robot name."""
-        for key, visualizer in self.robot_visualizers.items():
-            if robot_name == visualizer["robot_name"]:
-                return visualizer["visualizer"]
+    def __getManagerFromName(self, robot_name:str) -> Optional[RobotManager]:
+        """Find the manager from the robot name."""
+        for key, manager in self.robot_managers.items():
+            if robot_name == manager["robot_name"]:
+                return manager["manager"]
         return None
     
     def updateRobotState(self, robot_name:str, joint_positions: list[float]=None, backbone_SPs: np.ndarray=None, segment_end_transforms: np.ndarray=None) -> bool:
         
         start_time = time.time()
         
-        visualizer = self.__getVisualizerFromName(robot_name)
-        if not visualizer:
+        manager = self.__getManagerFromName(robot_name)
+        if not manager:
             qt.QMessageBox.critical(None, "Error", f"Robot {robot_name} is not loaded")
             return False
             
-        # was_modified = visualizer.robot_state_node.StartModify()
-        was_modified = visualizer.robot_state_node.StartModify()
+        # was_modified = manager.robot_state_node.StartModify()
+        was_modified = manager.robot_state_node.StartModify()
         if joint_positions is not None:
-            visualizer.updateJointState(joint_positions)
+            manager.updateJointState(joint_positions)
         if backbone_SPs is not None:
-            visualizer.updateSegmentState(backbone_SPs, segment_end_transforms)
-        visualizer.robot_state_node.EndModify(was_modified)
+            manager.updateSegmentState(backbone_SPs, segment_end_transforms)
+        manager.robot_state_node.EndModify(was_modified)
         
         execution_time = time.time() - start_time
         
         return True, execution_time
 
     def getRobotClass(self, robot_name:str):
-        visualizer = self.__getVisualizerFromName(robot_name)
-        if not visualizer:
+        manager = self.__getManagerFromName(robot_name)
+        if not manager:
             print(f"Robot {robot_name} is not loaded")
             return None
-        return visualizer.robot
+        return manager.robot
 
-    def getSegmentGlobalWaypoints(self, robot_name:str) -> np.ndarray:
-        visualizer = self.__getVisualizerFromName(robot_name)
-        if not visualizer:
+    def getSegmentGlobalSPs(self, robot_name:str) -> np.ndarray:
+        manager = self.__getManagerFromName(robot_name)
+        if not manager:
             print(f"Robot {robot_name} is not loaded")
             return None
-        return visualizer.segment_global_waypoints
+        return manager.segmentGlobalSPs()
     
     def getTransformsHierarchy(self, robot_name:str) -> dict:
-        visualizer = self.__getVisualizerFromName(robot_name)
-        if not visualizer:
+        manager = self.__getManagerFromName(robot_name)
+        if not manager:
             qt.QMessageBox.critical(None, "Error", f"Robot {robot_name} is not loaded")
             return None
-        return visualizer.getTransformsHierarchy()
+        return manager.getTransformsHierarchy()
     
     def RemoveRobot(self, robot_number: int) -> bool:
         """Remove a robot from the scene."""
-        if f"robot_{robot_number}" in self.robot_visualizers:
-            visualizer = self.robot_visualizers[f"robot_{robot_number}"]
-            visualizer["visualizer"].cleanup()
-            self.robot_node.urdf_file_paths.remove(visualizer["path"])
-            self.robot_node.robot_names.remove(visualizer["robot_name"])
-            self.robot_visualizers.pop(f"robot_{robot_number}", None)
+        if f"robot_{robot_number}" in self.robot_managers:
+            manager = self.robot_managers[f"robot_{robot_number}"]
+            manager["manager"].cleanup()
+            self.robot_node.urdf_file_paths.remove(manager["path"])
+            self.robot_node.robot_names.remove(manager["robot_name"])
+            self.robot_managers.pop(f"robot_{robot_number}", None)
             
-            qt.QMessageBox.information(None, "Success", f"Robot {visualizer['robot_name']} removed successfully")
+            qt.QMessageBox.information(None, "Success", f"Robot {manager['robot_name']} removed successfully")
 
     def RemoveAllRobots(self):
-        for name, visualizer in self.robot_visualizers.items():
-            visualizer["visualizer"].cleanup()
-            self.robot_node.urdf_file_paths.remove(visualizer["path"])
-            self.robot_node.robot_names.remove(visualizer["robot_name"])
-            # self.robot_visualizers.pop(name, None)
+        for name, manager in self.robot_managers.items():
+            manager["manager"].cleanup()
+            self.robot_node.urdf_file_paths.remove(manager["path"])
+            self.robot_node.robot_names.remove(manager["robot_name"])
+            # self.robot_managers.pop(name, None)
     
     def cleanup(self):
         """Cleanup resources when module is destroyed."""

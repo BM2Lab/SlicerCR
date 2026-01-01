@@ -1,0 +1,69 @@
+# SlicerRoboViz
+
+## Usage
+
+We provide a [**UsageTemplate**](../UsageTemplate/README.md) module for reference.
+
+### Loading a Robot
+
+1. Open the SlicerRoboViz module in 3D Slicer
+2. In the first robot panel, click the folder icon to browse for a URDF file
+3. Click **"Load Robot"** to visualize the robot
+4. The robot will appear in the 3D view with its initial configuration
+
+### Adding Multiple Robots
+
+1. Click **"Add New Robot"** to create additional robot panels
+2. Each panel can load a different robot independently
+3. Remove robots using the **"Remove Robot"** button in each panel
+
+### Updating Robot State
+
+Use the module's logic interface programmatically to update robot configurations:
+
+```python
+# Get the logic instance
+logic = slicer.util.getModuleLogic("SlicerRoboViz")
+
+# Update joint positions (for rigid-link robots)
+robot_name = "your_robot_name"
+joint_positions = [0.1, 0.2, 0.3, ...]  # radians or meters
+success, exec_time = logic.updateRobotState(robot_name, joint_positions=joint_positions)
+
+# Update continuum segments (for flexible robots)
+backbone_SPs = np.array([...])  # Shape: (num_segments, num_waypoints, 3)
+segment_transforms = np.array([...])  # Shape: (num_segments, 4, 4)
+logic.updateRobotState(robot_name, 
+                        backbone_SPs=backbone_SPs,
+                        segment_end_transforms=segment_transforms)
+```
+
+## URDF Extensions for Continuum Robots
+
+SlicerRoboViz extends standard URDF to support continuum robots with the following custom tags:
+
+```xml
+<segment name="segment_name" parent="parent_link">
+  <origin xyz="0 0 0" rpy="0 0 0"/>
+  <continuum_body initial_length="0.1">
+    <continuum_unit offset="0.01" angle="0.0"/>
+    <!-- Additional continuum units -->
+  </continuum_body>
+  <disks count="10" span="0.0 1.0">
+    <geometry type="mesh" filename="path/to/disk.stl"/>
+    <color rgba="1.0 0.0 0.0 1.0"/>
+  </disks>
+</segment>
+```
+
+## API Reference
+
+### SlicerRoboVizLogic Methods
+
+- `loadRobot(urdf_file_path, robot_number)`: Load a robot from URDF file
+- `updateRobotState(robot_name, joint_positions, backbone_waypoints, segment_end_transforms)`: Update robot configuration
+- `getRobotClass(robot_name)`: Get the URDF robot object
+- `getSegmentGlobalSPs(robot_name)`: Get continuum segment sample points in world coordinates
+- `getTransformsHierarchy(robot_name)`: Get the complete transform tree
+- `RemoveRobot(robot_number)`: Remove a specific robot from the scene
+- `RemoveAllRobots()`: Clear all robots from the scene

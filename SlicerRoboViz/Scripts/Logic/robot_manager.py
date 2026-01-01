@@ -19,15 +19,15 @@ from slicer.parameterNodeWrapper import (
 )
 import json
 from Scripts.Logic.robot_nodes import RobotDescriptionNode, RobotStateNode
-from Scripts.Utils.rendering_manager import RenderingManager
-from Scripts.Utils.segment_constructor import StateParser, WaypointFitter
+from Scripts.Logic.rendering_manager import RenderingManager
+from Scripts.Logic.segment_constructor import StateParser, WaypointFitter
 from Scripts.Utils.math_helper import MathHelper
 from scipy.spatial.transform import Rotation as R
 from Scripts.Logic.kinematics_manager import KinematicsManager
 
 
 
-class RobotVisualizer:
+class RobotManager:
 
     CONVERSION_SCALE = 1000
     Euler_ANGLE_ORDER = 'xyz'
@@ -59,13 +59,14 @@ class RobotVisualizer:
         # Initialize the parameter node
         
 
-    def visualizeRobot(self, urdfFilePath):
+    def initializeRobot(self, urdfFilePath):
+        self.urdf_dir = os.path.dirname(urdfFilePath)
         self.robot = self.loadURDF(urdfFilePath)
         if not self.robot:
             qt.QMessageBox.critical(None, "Error", f"Failed to load URDF: {urdfFilePath}")
             return
         self._updateParameterNode(self.robot)
-        self._renderLinksInSlicer(self.robot, urdfFilePath)
+        self.rendering_manager.renderLinksInSlicer(self)
         self.kinematics_manager.setupTransformHierarchy()
         self._renderContinuumBodyInSlicer(self.robot, urdfFilePath)
 
@@ -101,50 +102,6 @@ class RobotVisualizer:
         self.robot_state_node.segment_names = segment_names
         self.robot_state_node.AddObserver(vtk.vtkCommand.ModifiedEvent, self.__onStateUpdate)
 
-        
-    def _renderLinksInSlicer(self, robot, urdfFilePath):
-        self.urdf_dir = os.path.dirname(urdfFilePath)
-        self.link_model_nodes.clear()
-
-        for link in robot.links:
-            if not link.visual or not link.visual.geometry or not link.visual.geometry.filename:
-                print(f"Skipping link {link.name}: No visual geometry defined.")
-                continue
-
-            meshFilePath = os.path.normpath(os.path.join(self.urdf_dir, link.visual.geometry.filename))
-            if not os.path.exists(meshFilePath):
-                qt.QMessageBox.critical(None, "Error", f"Mesh file not found: {meshFilePath}")
-                continue
-
-            position = link.visual.origin.xyz if link.visual.origin else [0, 0, 0]
-            orientation = link.visual.origin.rpy if link.visual.origin else [0, 0, 0]
-            color = link.visual.material.color.rgba if link.visual.material and link.visual.material.color else [1, 1, 1, 1]
-            modelNode,_ = self._renderMeshInSlicer(meshFilePath, link.name, position, orientation, color, scale= self.CONVERSION_SCALE)
-            
-            self.link_model_nodes[link.name] = modelNode
-
-    
-
-    def _renderMeshInSlicer(self, meshFilePath,model_name, position, orientation, color, scale=None):
-        modelNode = slicer.modules.models.logic().AddModel(meshFilePath)
-        if not modelNode:
-            qt.QMessageBox.critical(None, "Error", f"Failed to load mesh")
-            return None
-        # Set the color
-        modelNode.GetDisplayNode().SetColor(color[0], color[1], color[2])
-        modelNode.GetDisplayNode().SetOpacity(color[3])
-        # Set the visual transform
-        transform = vtk.vtkTransform()
-        transform.Translate(position)
-        transform.RotateZ(np.degrees(orientation[2])) # intrinsic rotation
-        transform.RotateY(np.degrees(orientation[1]))
-        transform.RotateX(np.degrees(orientation[0]))
-        if scale:
-            transform.Scale([scale,scale,scale])
-        transformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTransformNode",f"{model_name}_visual_Transform")
-        transformNode.SetMatrixTransformToParent(transform.GetMatrix())
-        modelNode.SetAndObserveTransformNodeID(transformNode.GetID())
-        return modelNode, transformNode
 
     def _renderContinuumBodyInSlicer(self, robot, urdfFilePath):
         if robot.segments:
@@ -159,9 +116,9 @@ class RobotVisualizer:
     def getTransformsHierarchy(self):
         return self.kinematics_manager.getTransformsHierarchy()
 
-    #####################################
-    ####### Robot Motion ################
-    #####################################
+    ###########################################
+    ####### Robot State Update ################
+    ###########################################
     def updateJointState(self, joint_positions: list[float]):
         if len(joint_positions) != len(self.robot_state_node.joint_names):
             # qt.QMessageBox.critical(None, "Error", "Joint positions length does not match joint names length.")
@@ -265,8 +222,7 @@ class RobotVisualizer:
 
             finally:
                 
-                # self.rendering_manager.show(self.robot, self.segment_mapping)
-                self.rendering_manager.show(self.robot, self.segment_model_nodes)
+                self.rendering_manager.updateModelNode(self.robot, self.segment_model_nodes)
 
 
     def _updateVertebrae(self, segment, backbone_SPs, start_transform_node):
@@ -291,7 +247,7 @@ class RobotVisualizer:
             else:
                 # Create new model
                 meshFilePath = os.path.normpath(os.path.join(self.urdf_dir, segment.vertebrae.geometry.filename))
-                vertebra_model_node, vertebra_model_node_transform_node = self._renderMeshInSlicer(
+                vertebra_model_node, vertebra_model_node_transform_node = self.rendering_manager.renderMeshInSlicer(
                     meshFilePath, model_name, vertebra_centers[j], vertebra_directions[j], 
                     segment.vertebrae.color.rgba, scale=self.CONVERSION_SCALE
                 )
@@ -327,9 +283,27 @@ class RobotVisualizer:
     def joint_names(self):
         return self.robot_description_node.joint_names
 
-    @property
-    def segment_global_waypoints(self):
-        return None
+    
+    def segmentGlobalSPs(self):
+        """
+        Convert stored segment sample points (SPs) into world coordinates.
+        Uses each segment's start transform node to lift local SPs to RAS.
+        """
+        local_SPs = MathHelper.string2Array(self.robot_state_node.segment_SPs)
+        if local_SPs is None:
+            return None
+
+        global_SPs = []
+        vtk_matrix_world = vtk.vtkMatrix4x4()
+
+        for segment, local_wp in zip(self.robot.segments, local_SPs):
+            # Fetch the start transform for this segment
+            start_node = self.kinematics_manager.segment_transform_container[segment.name]["transform_node(start)"]
+            start_node.GetMatrixTransformToWorld(vtk_matrix_world)
+            global_wp = MathHelper.transformWaypoints(local_wp, vtk_matrix_world)
+            global_SPs.append(global_wp)
+
+        return np.array(global_SPs)
     
     ######################################
     ############## Cleanup ###############

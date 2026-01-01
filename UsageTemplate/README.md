@@ -7,8 +7,6 @@ A template module for SlicerRobot that demonstrates various robot visualization 
 The UsageTemplate module serves as a practical example implementation for the SlicerRobot extension. It provides six different robot demonstrations that showcase various visualization techniques and robot control methods using the SlicerRoboViz system.
 
 
-
-
 ## Installation
 
 1. Ensure SlicerRoboViz is properly installed (see main README.md)
@@ -31,14 +29,16 @@ UsageTemplate/
 │       ├── Demo_3/
 │       ├── Demo_4/
 │       ├── Demo_5/
-│       └── Demo_6/
+│       ├── Demo_6/
+│       ├── Demo_7/
+│       └── Demo_8/
 └── README.md
 ```
 
 ### Running Demonstrations
 
 1. Open the UsageTemplate module in 3D Slicer
-2. Select a demo from the dropdown menu (Demo 1-6)
+2. Select a demo from the dropdown menu (Demo 1-8)
 3. Set the desired frequency (Hz) for the animation
 4. Click "Start" to begin the demonstration
 5. Click "Stop" to end the animation

@@ -1,11 +1,14 @@
-
+import sys
+import os
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
 import json
 import numpy as np
 from scipy.interpolate import splprep, splev
 from scipy.spatial.transform import Rotation as R
 import vtk
 import time
-from .math_helper import MathHelper
+from Scripts.Utils.math_helper import MathHelper
 class StateParser:
 
     def __init__(self):
