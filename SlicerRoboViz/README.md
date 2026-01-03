@@ -67,3 +67,14 @@ SlicerRoboViz extends standard URDF to support continuum robots with the followi
 - `getTransformsHierarchy(robot_name)`: Get the complete transform tree
 - `RemoveRobot(robot_number)`: Remove a specific robot from the scene
 - `RemoveAllRobots()`: Clear all robots from the scene
+
+## Dependencies
+
+This module utilizes the **urdf_parser_py** library developed by the ROS (Robot Operating System) community:
+
+- **Repository**: [https://github.com/ros/urdf_parser_py](https://github.com/ros/urdf_parser_py)
+- **Integration**: Embedded in `Dependencies/urdf_parser_py/` with extensions for continuum robots
+
+### Acknowledgment
+
+We gratefully acknowledge the ROS community and the contributors to the `urdf_parser_py` project. The library provides the foundation for URDF parsing in this module. We have extended it to support custom continuum robot descriptions while maintaining compatibility with standard URDF formats.

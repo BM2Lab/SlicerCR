@@ -88,18 +88,6 @@ Below are visual demonstrations of SlicerRoboViz capabilities:
 1. [**SlicerRoboViz**](SlicerRoboViz/README.md): Main module providing the Slicer widget interface and logic
 2. [**SlicerComm**](SlicerComm/README.md): Communication module providing Serial, TCP/IP, and UDP communications
 
-
-### Dependencies
-
-This module utilizes the **urdf_parser_py** library developed by the ROS (Robot Operating System) community:
-
-- **Repository**: [https://github.com/ros/urdf_parser_py](https://github.com/ros/urdf_parser_py)
-- **Integration**: Embedded in `Dependencies/urdf_parser_py/` with extensions for continuum robots
-
-#### Acknowledgment
-
-We gratefully acknowledge the ROS community and the contributors to the `urdf_parser_py` project. The library provides the foundation for URDF parsing in this module. We have extended it to support custom continuum robot descriptions while maintaining compatibility with standard URDF formats.
-
 ## Installation
 
 1. Install [3D Slicer](https://download.slicer.org/) (version 5.0 or later recommended)
