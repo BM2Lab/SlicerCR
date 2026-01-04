@@ -19,7 +19,7 @@ from slicer.parameterNodeWrapper import (
 import qt
 from slicer import vtkMRMLScalarVolumeNode
 from Scripts.Logic.robot_manager import RobotManager
-from Scripts.Logic.robot_nodes import RobotNode
+from Scripts.Logic.robot_nodes import RobotNode, RobotDescriptionNode, RobotStateNode
 import numpy as np
 import csv
 from datetime import datetime
@@ -352,6 +352,21 @@ class SlicerRoboVizLogic(ScriptedLoadableModuleLogic):
         execution_time = time.time() - start_time
         
         return True, execution_time
+
+    def getRobots(self) -> list[str]:
+        return self.robot_node.robot_names
+
+    def getRobotDescriptionNode(self, robot_name:str):
+        node = slicer.mrmlScene.GetFirstNodeByName(f"SRVRobotDescriptionNode({robot_name})")
+        if not node:
+            return None
+        return RobotDescriptionNode(node)
+
+    def getRobotStateNode(self, robot_name:str):
+        node = slicer.mrmlScene.GetFirstNodeByName(f"SRVRobotStateNode({robot_name})")
+        if not node:
+            return None
+        return RobotStateNode(node)
 
     def getRobotClass(self, robot_name:str):
         manager = self.__getManagerFromName(robot_name)

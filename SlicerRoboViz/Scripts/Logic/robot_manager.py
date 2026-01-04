@@ -87,8 +87,9 @@ class RobotManager:
         self.robot_description_node.joint_names ="\n"+ ', '.join(joint_names)
         link_names = [link.name for link in robot.links]
         self.robot_description_node.link_names = "\n"+ ', '.join(link_names)
-        self.robot_description_node.joint_mapping = "\n"+ '\n'.join([f"Joint: {joint.name}, Parent: {joint.parent}, Child: {joint.child}" for joint in robot.joints])
-        
+        joint_hierarchy = '\n'.join([f"Joint: {joint.name}, Parent: {joint.parent}, Child: {joint.child}" for joint in robot.joints])
+        segment_hierarchy = "\n"+ '\n'.join([f"Segment: {segment.name}, Parent: {segment.parent}" for segment in robot.segments])
+        self.robot_description_node.hierarchy = joint_hierarchy + segment_hierarchy
         segment_names = [segment.name for segment in robot.segments]
         self.robot_description_node.segment_names = "\n"+ ', '.join(segment_names)
 

@@ -10,7 +10,7 @@ class RobotDescriptionNode:
     joint_names: str = ""
     link_names: str = ""
     segment_names: str = ""
-    joint_mapping: str = ""
+    hierarchy: str = ""
 
 @parameterNodeWrapper
 class RobotStateNode:
