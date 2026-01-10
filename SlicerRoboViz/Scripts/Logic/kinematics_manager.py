@@ -12,7 +12,7 @@ class KinematicsManager:
         self.segment_transform_container = {}
         self.root_transform_nodes = {}
         self.transform_nodes = []
-
+        self.hierarchy = {}
     def setupTransformHierarchy(self):
         self.setup()
         self.buildTransforms()
@@ -20,6 +20,7 @@ class KinematicsManager:
         self.processSegmentTransforms()
         self.collectTransformSubtree()
         self.convertInitialTransforms()
+        print(self.hierarchy)
     
     def setup(self):
         """Setup the mapping for the joints and segments"""
@@ -71,13 +72,14 @@ class KinematicsManager:
                  segment_start_transform_node = self.segment_transform_container[joint.child]["transform_node(start)"]
                  segment_start_transform_node.SetAndObserveTransformNodeID(joint_transform_node.GetID())
                  print(f"Attached {joint.name}_Transform to {joint.child}_Transform")
-            
+                 self.registerTransformHierarchy(joint_transform_node, segment_start_transform_node, "child")
             
             if joint.parent in self.robot_manager.link_model_nodes:
                 parent_joint_name, _ = self.findParentJointbyChildLink(joint.parent)
                 if parent_joint_name:
                     parent_joint_transform_node = self.joint_transform_container[parent_joint_name]["transform_node"]
                     joint_transform_node.SetAndObserveTransformNodeID(parent_joint_transform_node.GetID())
+                    self.registerTransformHierarchy(joint_transform_node, parent_joint_transform_node, "parent")
                 else:
                     # If no parent joint, the link is the uppermost parent link,
                     # we create a root transform node, attach the visual to it and child the joint transform to it
@@ -85,10 +87,12 @@ class KinematicsManager:
                     self.attachLinkVisualToRoot(joint.parent, root_transform_node)
                     joint_transform_node.SetAndObserveTransformNodeID(root_transform_node.GetID())
                     self.root_transform_nodes[joint.parent] = root_transform_node
+                    self.registerTransformHierarchy(joint_transform_node, root_transform_node, "parent")
                     print(f"Set {joint.parent} as root")
             elif joint.parent in self.segment_transform_container:
                 parent_segment_end_transform_node = self.segment_transform_container[joint.parent]["transform_node(end)"]
                 joint_transform_node.SetAndObserveTransformNodeID(parent_segment_end_transform_node.GetID())
+                self.registerTransformHierarchy(joint_transform_node, parent_segment_end_transform_node, "parent")
                 print(f"Attached {joint.name}_Transform to {joint.parent}_Transform")
     
     def processSegmentTransforms(self):
@@ -98,11 +102,13 @@ class KinematicsManager:
             if segment.parent in self.segment_transform_container:
                 segment_parent_end_transform_node = self.segment_transform_container[segment.parent]["transform_node(end)"]
                 segment_start_transform_node.SetAndObserveTransformNodeID(segment_parent_end_transform_node.GetID())
+                self.registerTransformHierarchy(segment_start_transform_node, segment_parent_end_transform_node, "child")
                 print(f"Attached {segment.name}_Transform to {segment.parent}_Transform")
             elif segment.parent not in self.robot_manager.link_model_nodes: # if the parent is a blank base, we create a root transform node, attach the visual to it and child the segment transform to it
                 root_transform_node = self.getOrCreateRootTransform(segment.parent)
                 segment_start_transform_node.SetAndObserveTransformNodeID(root_transform_node.GetID())
                 self.root_transform_nodes[segment.parent] = root_transform_node
+                self.registerTransformHierarchy(segment_start_transform_node, root_transform_node, "parent")
                 print(f"Set {segment.parent} as root")
 
     def attachLinkVisualToJoint(self, link_name, transformNode):
@@ -163,7 +169,26 @@ class KinematicsManager:
         if visual_transform_node:
             visual_transform_node.SetAndObserveTransformNodeID(root_node.GetID())
 
-   
+    def registerTransformHierarchy(self, target_transform_node, reference_transform_node, relationship):
+        """Register the transform hierarchy"""
+        if target_transform_node.GetName() not in self.hierarchy:
+            self.hierarchy[target_transform_node.GetName()] = {"child":"", "parent":""}
+        if relationship == "child":
+            # check if the reference_transform_node is already in the child list
+            if reference_transform_node.GetName() in self.hierarchy[target_transform_node.GetName()]["child"]:
+                return
+            self.hierarchy[target_transform_node.GetName()]["child"] = \
+             reference_transform_node.GetName() + "\n" + self.hierarchy[target_transform_node.GetName()]["child"]
+            self.registerTransformHierarchy(reference_transform_node, target_transform_node, "parent")
+        elif relationship == "parent":
+            # check if the reference_transform_node is already in the parent list
+            if reference_transform_node.GetName() in self.hierarchy[target_transform_node.GetName()]["parent"]:
+                return
+            self.hierarchy[target_transform_node.GetName()]["parent"] = \
+             reference_transform_node.GetName() + "\n" + self.hierarchy[target_transform_node.GetName()]["parent"]
+            self.registerTransformHierarchy(reference_transform_node, target_transform_node, "child")
+        else:
+            raise ValueError(f"Invalid relationship: {relationship}")
     ######################################################
    
     def collectTransformSubtree(self):

@@ -389,6 +389,13 @@ class SlicerRoboVizLogic(ScriptedLoadableModuleLogic):
             return None
         return manager.getTransformsHierarchy()
     
+    def getTransformsHierarchyString(self, robot_name:str) -> str:
+        manager = self.__getManagerFromName(robot_name)
+        if not manager:
+            qt.QMessageBox.critical(None, "Error", f"Robot {robot_name} is not loaded")
+            return None
+        return manager.getTransformsHierarchyString()
+    
     def RemoveRobot(self, robot_number: int) -> bool:
         """Remove a robot from the scene."""
         if f"robot_{robot_number}" in self.robot_managers:

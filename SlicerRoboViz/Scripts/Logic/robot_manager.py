@@ -306,6 +306,8 @@ class RobotManager:
 
         return np.array(global_SPs)
     
+    def getTransformsHierarchyString(self):
+        return "\n".join([f"{key}: {value}" for key, value in self.kinematics_manager.hierarchy.items()])
     ######################################
     ############## Cleanup ###############
     ######################################

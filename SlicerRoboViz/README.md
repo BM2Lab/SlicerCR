@@ -62,9 +62,13 @@ SlicerRoboViz extends standard URDF to support continuum robots with the followi
 
 - `loadRobot(urdf_file_path, robot_number)`: Load a robot from URDF file
 - `updateRobotState(robot_name, joint_positions, backbone_waypoints, segment_end_transforms)`: Update robot configuration
-- `getRobotClass(robot_name)`: Get the URDF robot object
+- `getRobots()`: Get the names of loaded robot
+- `getRobotDescriptionNode(robot_name)`: Get the SRVRobotDescriptionNode
+- `getRobotStateNode(robot_name)`: Get the SRVRobotStateNode
+- `getRobotClass(robot_name)`: Get the robot object that stores URDF data
 - `getSegmentGlobalSPs(robot_name)`: Get continuum segment sample points in world coordinates
-- `getTransformsHierarchy(robot_name)`: Get the complete transform tree
+- `getTransformsHierarchy(robot_name)`: Get the complete transform nodes
+- `getTransformsHierarchyString(robot_name)`: Get the transform hierachy with string format
 - `RemoveRobot(robot_number)`: Remove a specific robot from the scene
 - `RemoveAllRobots()`: Clear all robots from the scene
 
