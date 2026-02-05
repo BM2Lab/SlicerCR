@@ -34,7 +34,9 @@ class RenderingManager():
             position = link.visual.origin.xyz if link.visual.origin else [0, 0, 0]
             orientation = link.visual.origin.rpy if link.visual.origin else [0, 0, 0]
             color = link.visual.material.color.rgba if link.visual.material and link.visual.material.color else [1, 1, 1, 1]
-            modelNode,_ = self.renderMeshInSlicer(meshFilePath, link.name, position, orientation, color, scale= self.CONVERSION_SCALE)
+            scale = link.visual.geometry.scale if link.visual.geometry.scale else [1,1,1]
+            scale = [s*self.CONVERSION_SCALE for s in scale]
+            modelNode,_ = self.renderMeshInSlicer(meshFilePath, link.name, position, orientation, color, scale= scale)
             
             robot_manager.link_model_nodes[link.name] = modelNode
 
@@ -54,8 +56,8 @@ class RenderingManager():
         transform.RotateZ(np.degrees(orientation[2])) # intrinsic rotation
         transform.RotateY(np.degrees(orientation[1]))
         transform.RotateX(np.degrees(orientation[0]))
-        if scale:
-            transform.Scale([scale,scale,scale])
+        if scale is not None and  len(scale) == 3:
+            transform.Scale([scale[0],scale[1],scale[2]])
         transformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTransformNode",f"{model_name}_visual_Transform")
         transformNode.SetMatrixTransformToParent(transform.GetMatrix())
         modelNode.SetAndObserveTransformNodeID(transformNode.GetID())

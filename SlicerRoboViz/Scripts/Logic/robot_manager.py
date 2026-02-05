@@ -248,9 +248,11 @@ class RobotManager:
             else:
                 # Create new model
                 meshFilePath = os.path.normpath(os.path.join(self.urdf_dir, segment.vertebrae.geometry.filename))
+                scale = segment.vertebrae.geometry.scale if segment.vertebrae.geometry.scale else [1,1,1]
+                scale = [s*self.CONVERSION_SCALE for s in scale]
                 vertebra_model_node, vertebra_model_node_transform_node = self.rendering_manager.renderMeshInSlicer(
                     meshFilePath, model_name, vertebra_centers[j], vertebra_directions[j], 
-                    segment.vertebrae.color.rgba, scale=self.CONVERSION_SCALE
+                    segment.vertebrae.color.rgba, scale=scale
                 )
                 vertebra_model_node_transform_node.SetAndObserveTransformNodeID(start_transform_node.GetID())
                 self.vertebra_model_nodes[model_name] = vertebra_model_node

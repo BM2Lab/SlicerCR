@@ -55,6 +55,7 @@ SlicerRoboViz extends standard URDF to support continuum robots with the followi
   </disks>
 </segment>
 ```
+Note: General URDF file uses meter as defualt unit and so does SlicerCR.
 
 ## API Reference
 

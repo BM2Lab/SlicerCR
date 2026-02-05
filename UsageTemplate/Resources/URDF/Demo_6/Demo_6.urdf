@@ -31,11 +31,6 @@
       link="segment_1" />
     <axis
       xyz="0 0 1" />
-    <limit
-      lower="0"
-      upper="0"
-      effort="0"
-      velocity="0" />
   </joint>
 
 
@@ -94,11 +89,6 @@
       link="middle_proximal_link" />
     <axis
       xyz="0 0 1" />
-    <limit
-      lower="0"
-      upper="0"
-      effort="0"
-      velocity="0" />
   </joint>
 
   <link
@@ -131,11 +121,6 @@
       link="segment_2" />
     <axis
       xyz="0 0 1" />
-    <limit
-      lower="0"
-      upper="0"
-      effort="0"
-      velocity="0" />
   </joint>
 
    <segment name="segment_2">
@@ -194,11 +179,6 @@
       link="middle_proximal_2_link" />
     <axis
       xyz="0 0 1" />
-    <limit
-      lower="0"
-      upper="0"
-      effort="0"
-      velocity="0" />
   </joint>
 
   <link
@@ -231,11 +211,6 @@
       link="segment_3" />
     <axis
       xyz="0 0 1" />
-    <limit
-      lower="0"
-      upper="0"
-      effort="0"
-      velocity="0" />
   </joint>
 
    <segment name="segment_3">
@@ -282,11 +257,6 @@
       link="top_link" />
     <axis
       xyz="0 0 1" />
-    <limit
-      lower="0"
-      upper="0"
-      effort="0"
-      velocity="0" />
   </joint>
 
   <link
