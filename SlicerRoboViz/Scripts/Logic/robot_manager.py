@@ -175,11 +175,9 @@ class RobotManager:
                     angle_deg = np.degrees(position)
                     transform.RotateWXYZ(angle_deg, -axis[0], -axis[1], axis[2])
                 elif jointType == "prismatic":
-                    scale_factor = position * self.CONVERSION_SCALE
-                    transform.Translate(-axis[0] * scale_factor, -axis[1] * scale_factor, axis[2] * scale_factor)
+                    transform.Translate(-axis[0] * position, -axis[1] * position, axis[2] * position)
 
                 transformNode.SetMatrixTransformToParent(transform.GetMatrix())
-        # print(f"Time spent in __onStateUpdate joint part: {(time.time() - start_time)*1000:.2f} ms")
         # Optimize segment sample point updates
         old_segment_SPs = self.robot_state_node.old_segment_SPs
         segment_SPs = self.robot_state_node.segment_SPs
