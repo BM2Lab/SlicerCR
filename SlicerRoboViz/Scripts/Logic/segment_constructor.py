@@ -324,30 +324,157 @@ class WaypointFitter:
         return True
         
 
-    def getIntermediatePoses(self,default_direction, convention, waypoint_data, u_new):
+    def MRF(self, positions, tangents, initial_reference, tolerance=1e-12):
+        """Compute rotation-minimizing frames using double reflection.
 
+        Implements Table I of Wang et al. (2008), "Computation of Rotation
+        Minimizing Frames." Each returned matrix has columns [r_i, s_i, t_i].
+        """
+        positions = np.asarray(positions, dtype=float)
+        tangents = np.asarray(tangents, dtype=float)
+        if positions.shape != tangents.shape or positions.ndim != 2:
+            raise ValueError("positions and tangents must have matching Nx3 shapes.")
+        if positions.shape[1] != 3 or len(positions) < 1:
+            raise ValueError("At least one 3D sample is required.")
+
+        tangent_norms = np.linalg.norm(tangents, axis=1, keepdims=True)
+        if np.any(tangent_norms < tolerance):
+            raise ValueError("All tangent vectors must be non-zero.")
+        tangents = tangents / tangent_norms
+
+        reference = np.asarray(initial_reference, dtype=float).flatten()
+        reference -= np.dot(reference, tangents[0]) * tangents[0]
+        reference_norm = np.linalg.norm(reference)
+        if reference_norm < tolerance:
+            raise ValueError("initial_reference must not parallel the first tangent.")
+        reference /= reference_norm
+
+        frames = np.empty((len(positions), 3, 3))
+        secondary = np.cross(tangents[0], reference)
+        frames[0] = np.column_stack((reference, secondary, tangents[0]))
+
+        for index in range(len(positions) - 1):
+            v1 = positions[index + 1] - positions[index]
+            c1 = np.dot(v1, v1)
+            if c1 < tolerance:
+                raise ValueError(
+                    f"MRF first reflection degenerates at samples {index} and "
+                    f"{index + 1}: coincident points."
+                )
+            reflected_reference = (
+                reference - (2.0 / c1) * np.dot(v1, reference) * v1
+            )
+            reflected_tangent = (
+                tangents[index]
+                - (2.0 / c1) * np.dot(v1, tangents[index]) * v1
+            )
+
+            v2 = tangents[index + 1] - reflected_tangent
+            c2 = np.dot(v2, v2)
+            if c2 < tolerance:
+                raise ValueError(
+                    f"MRF second reflection degenerates at samples {index} and "
+                    f"{index + 1}; subdivide this curve interval."
+                )
+            reference = (
+                reflected_reference
+                - (2.0 / c2) * np.dot(v2, reflected_reference) * v2
+            )
+
+            reference -= (
+                np.dot(reference, tangents[index + 1]) * tangents[index + 1]
+            )
+            reference /= np.linalg.norm(reference)
+            secondary = np.cross(tangents[index + 1], reference)
+            secondary /= np.linalg.norm(secondary)
+            frames[index + 1] = np.column_stack(
+                (reference, secondary, tangents[index + 1])
+            )
+
+        return frames
+
+    def getIntermediatePoses(self, default_direction, convention, waypoint_data, u_new):
+        """Compute spline poses with a double-reflection minimizing frame."""
         if self.__isCached(waypoint_data):
             tck = self.cached_tck
         else:
-            self.cached_waypoints = waypoint_data.copy() # Remember to copy the value instead of reference
+            self.cached_waypoints = waypoint_data.copy()
             _, _, tck = self.fitCurveToWaypoints(waypoint_data)
             self.cached_tck = tck
-        # _, _, tck = self.fitCurveToWaypoints(waypoint_data)
-        point_centers = np.array(splev(u_new, tck, der=0)).T
-        point_derivatives = np.array(splev(u_new, tck, der=1)).T
-        point_directions = point_derivatives / np.linalg.norm(point_derivatives, axis=1, keepdims=True)
+
+        requested_u = np.asarray(u_new, dtype=float).flatten()
+        if requested_u.size == 0:
+            raise ValueError("u_new must contain at least one parameter value.")
+        if np.any(requested_u < 0.0) or np.any(requested_u > 1.0):
+            raise ValueError("u_new values must lie in the interval [0, 1].")
+
+        # Always transport from the spline start. Internal samples ensure that
+        # endpoint-only requests still use the piecewise double-reflection path.
+        max_u = float(np.max(requested_u))
+        transport_count = max(20, waypoint_data.shape[0], requested_u.size)
+        if max_u > 0.0:
+            transport_u = np.linspace(0.0, max_u, transport_count)
+            transport_u = np.unique(
+                np.concatenate((transport_u, requested_u, np.array([0.0])))
+            )
+        else:
+            transport_u = np.array([0.0])
+
+        transport_centers = np.array(splev(transport_u, tck, der=0)).T
+        point_derivatives = np.array(splev(transport_u, tck, der=1)).T
+        derivative_norms = np.linalg.norm(
+            point_derivatives, axis=1, keepdims=True
+        )
+        if np.any(derivative_norms < 1e-10):
+            raise ValueError("Cannot calculate a pose from a zero-length tangent.")
+
+        tangent_directions = point_derivatives / derivative_norms
+
+        default_direction = np.asarray(default_direction, dtype=float).flatten()
+        default_norm = np.linalg.norm(default_direction)
+        if default_norm < 1e-10:
+            raise ValueError("default_direction must be non-zero.")
+        default_direction /= default_norm
+
+        reference_seed = np.array([1.0, 0.0, 0.0])
+        if abs(np.dot(reference_seed, default_direction)) > 0.9:
+            reference_seed = np.array([0.0, 1.0, 0.0])
+        base_reference = (
+            reference_seed
+            - np.dot(reference_seed, default_direction) * default_direction
+        )
+        base_reference /= np.linalg.norm(base_reference)
+        base_secondary = np.cross(default_direction, base_reference)
+        base_frame = np.column_stack(
+            (base_reference, base_secondary, default_direction)
+        )
+
+        _, initial_rotation = self.vectors_to_euler_angles(
+            default_direction, tangent_directions[0], convention
+        )
+        initial_reference = initial_rotation @ base_reference
+        transported_frames = self.MRF(
+            transport_centers, tangent_directions, initial_reference
+        )
+        rotation_matrices = transported_frames @ base_frame.T
+
+        requested_indices = np.searchsorted(transport_u, requested_u)
+        point_centers = transport_centers[requested_indices]
+        requested_rotations = rotation_matrices[requested_indices]
+        euler_directions = R.from_matrix(requested_rotations).as_euler(
+            convention, degrees=True
+        )
 
         transform_matrices = []
-        for i in range(point_directions.shape[0]):
-            euler_angles, rotation_matrix = self.vectors_to_euler_angles( default_direction, point_directions[i],convention)
-            point_directions[i] = euler_angles
+        for point_center, rotation_matrix in zip(
+            point_centers, requested_rotations
+        ):
             transform_matrix = np.eye(4)
-            transform_matrix[:3,:3] = rotation_matrix
-            transform_matrix[:3,3] = point_centers[i]
+            transform_matrix[:3, :3] = rotation_matrix
+            transform_matrix[:3, 3] = point_center
             transform_matrices.append(transform_matrix)
 
-       
-        return point_centers , point_directions, transform_matrices
+        return point_centers, euler_directions, transform_matrices
 
     def getEndPose(self, waypoint_data):
         curve_points, curve_derivatives, tck = self.fitCurveToWaypoints(waypoint_data)
