@@ -4,7 +4,7 @@
 
 ## Overview
 
-SlicerRobo is a 3D Slicer module for visualizing and animating robotic systems within the medical imaging environment. It provides real-time rendering of both rigid-link and continuum robots by parsing URDF (Unified Robot Description Format) files and displaying them alongside medical imaging data.
+SlicerCR is a 3D Slicer module for visualizing and animating continuum robot systems within the medical imaging environment. It provides real-time rendering of both rigid-links and continuum units by parsing extended URDF (Unified Robot Description Format) files and displaying them alongside medical imaging data.
 
 ## Demonstrations
 
