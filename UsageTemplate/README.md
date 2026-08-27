@@ -1,16 +1,16 @@
 # UsageTemplate
 
-A template module for SlicerRobot that demonstrates various robot visualization capabilities and provides example implementations for different robot types.
+A template module for SlicerCR that demonstrates various robot visualization capabilities and provides example implementations for different robot types.
 
 ## Overview
 
-The UsageTemplate module serves as a practical example implementation for the SlicerRobot extension. It provides six different robot demonstrations that showcase various visualization techniques and robot control methods using the SlicerRoboViz system.
+The UsageTemplate module serves as a practical example implementation for the SlicerCR extension. It provides six different robot demonstrations that showcase various visualization techniques and robot control methods using the SlicerRoboViz system.
 
 
 ## Installation
 
 1. Ensure SlicerRoboViz is properly installed (see main README.md)
-2. The UsageTemplate module will be available under the "SlicerRobot" category
+2. The UsageTemplate module will be available under the "SlicerCR" category
 3. No additional setup required - all dependencies are included
 
 ## Usage
